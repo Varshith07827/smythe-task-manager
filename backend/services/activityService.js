@@ -1,0 +1,106 @@
+const ActivityLog = require('../models/ActivityLog');
+
+const activityService = {
+  async log({ organization, board, task, user, action, target, changes, req }) {
+    try {
+      const log = await ActivityLog.create({
+        organization,
+        board,
+        task,
+        user: user._id || user,
+        action,
+        target,
+        changes,
+        ipAddress: req?.ip,
+        userAgent: req?.get('User-Agent')
+      });
+
+      // Emit real-time activity event for live log refresh
+      if (board) {
+        try {
+          const socketService = require('./socketService');
+          socketService.activityLogged(board.toString(), log);
+        } catch {}
+      }
+    } catch (err) {
+      console.error('Activity log error:', err);
+    }
+  },
+
+  addTaskHistory(task, { changedBy, action, field, oldValue, newValue, metadata }) {
+    task.history.push({
+      changedBy,
+      action,
+      field,
+      oldValue,
+      newValue,
+      timestamp: new Date(),
+      metadata
+    });
+  },
+
+  diffChanges(oldObj, newObj, fields) {
+    const changes = [];
+    for (const field of fields) {
+      const oldVal = oldObj[field];
+      const newVal = newObj[field];
+      if (JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
+        changes.push({ field, from: oldVal, to: newVal });
+      }
+    }
+    return changes;
+  },
+
+  async getBoardActivity(boardId, { page = 1, limit = 50 }) {
+    return ActivityLog.find({ board: boardId })
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .populate('user', 'name avatar')
+      .lean();
+  },
+
+  async getTaskActivity(taskId) {
+    return ActivityLog.find({ task: taskId })
+      .sort({ createdAt: -1 })
+      .populate('user', 'name avatar')
+      .lean();
+  },
+
+  async getGlobalActivity(organizationId, { page = 1, limit = 25, search, userName, userId, boardId }) {
+    const User = require('../models/User');
+    const query = { organization: organizationId };
+    if (userId) query.user = userId;
+    if (boardId) query.board = boardId;
+    if (search) {
+      query.$or = [
+        { action: { $regex: search, $options: 'i' } },
+        { 'target.name': { $regex: search, $options: 'i' } }
+      ];
+    }
+    // Search by user name: find matching user IDs first
+    if (userName) {
+      const matchingUsers = await User.find({
+        organization: organizationId,
+        name: { $regex: userName, $options: 'i' }
+      }).select('_id').lean();
+      const userIds = matchingUsers.map(u => u._id);
+      query.user = { $in: userIds };
+    }
+
+    const [logs, total] = await Promise.all([
+      ActivityLog.find(query)
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .populate('user', 'name avatar email')
+        .populate('board', 'title')
+        .lean(),
+      ActivityLog.countDocuments(query)
+    ]);
+
+    return { logs, total, page, pages: Math.ceil(total / limit) };
+  }
+};
+
+module.exports = activityService;

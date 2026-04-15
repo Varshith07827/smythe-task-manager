@@ -1,0 +1,43 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(netstat -ano)",
+      "Bash(taskkill //PID 17568 //F)",
+      "Bash(curl -s http://localhost:5000/api/health)",
+      "Bash(curl -s -X POST http://localhost:5000/api/auth/register -H \"Content-Type: application/json\" -d '{\"\"name\"\":\"\"Test User\"\",\"\"email\"\":\"\"test@example.com\"\",\"\"password\"\":\"\"password123\"\",\"\"organizationName\"\":\"\"Test Org\"\"}')",
+      "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2OWJiYjVjZWZjYzY5NmY2ZDIxMGQwNTUiLCJpYXQiOjE3NzM5MDk0NTQsImV4cCI6MTc3NDUxNDI1NH0.p_tx6ltWn27-QcqrkJ4_Kt1iDJficQOuFJznKyn0mB4\" BOARD_ID=\"69bbb5dbfcc696f6d210d062\" __NEW_LINE_b518c139aeba5ef2__ echo \"=== ADD COLUMN ===\" curl -s -X POST \"http://localhost:5000/api/boards/$BOARD_ID/columns\" -H \"Content-Type: application/json\" -H \"Authorization: Bearer $TOKEN\" -d '{\"\"\"\"name\"\"\"\":\"\"\"\"Sprint\"\"\"\",\"\"\"\"type\"\"\"\":\"\"\"\"dropdown\"\"\"\",\"\"\"\"options\"\"\"\":[\"\"\"\"Sprint 1\"\"\"\",\"\"\"\"Sprint 2\"\"\"\",\"\"\"\"Sprint 3\"\"\"\"]}')",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(''''columns:'''', len\\(d[''''columns'''']\\), [c[''''name''''] for c in d[''''columns'''']]\\)\" 2)",
+      "Bash(1 __NEW_LINE_b518c139aeba5ef2__ echo \"\" echo \"=== INVITE USER ===\" curl -s -X POST \"http://localhost:5000/api/auth/invite\" -H \"Content-Type: application/json\" -H \"Authorization: Bearer $TOKEN\" -d '{\"\"\"\"name\"\"\"\":\"\"\"\"Jane Smith\"\"\"\",\"\"\"\"email\"\"\"\":\"\"\"\"jane@example.com\"\"\"\",\"\"\"\"role\"\"\"\":\"\"\"\"manager\"\"\"\"}' 2)",
+      "Bash(1 __NEW_LINE_b518c139aeba5ef2__ echo \"\" echo \"=== GET ORG MEMBERS ===\" curl -s \"http://localhost:5000/api/users\" -H \"Authorization: Bearer $TOKEN\" 2)",
+      "Bash(1 __NEW_LINE_b518c139aeba5ef2__ echo \"\" echo \"=== SEARCH TASKS ===\" curl -s \"http://localhost:5000/api/boards/$BOARD_ID/tasks?search=login\" -H \"Authorization: Bearer $TOKEN\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(''''search results:'''', d[''''total''''], [t[''''title''''] for t in d[''''tasks'''']]\\)\" 2)",
+      "Bash(1 __NEW_LINE_b518c139aeba5ef2__ echo \"\" echo \"=== FILTER BY STATUS ===\" curl -s \"http://localhost:5000/api/boards/$BOARD_ID/tasks?status=completed\" -H \"Authorization: Bearer $TOKEN\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(''''completed tasks:'''', d[''''total''''], [t[''''title''''] for t in d[''''tasks'''']]\\)\")",
+      "Bash(npm install:*)",
+      "Bash(npx vite:*)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(grep -E \"\\\\.\\(js|ts\\)$\")",
+      "Bash(grep -r attachment /c/Users/alone/OneDrive/Desktop/Smythe/backend/*.js)",
+      "Bash(node server.js)",
+      "Bash(pip install:*)",
+      "Bash(python -c \":*)",
+      "Bash(grep -n \"assignedTo\" /c/Users/alone/OneDrive/Desktop/Smythe/frontend/src/components/*.jsx)",
+      "Bash(grep -l \"setInterval\\\\|setTimeout\\\\|schedule\\\\|cron\" \"C:\\\\Users\\\\alone\\\\OneDrive\\\\Desktop\\\\Smythe\\\\backend\"/*.js \"C:\\\\Users\\\\alone\\\\OneDrive\\\\Desktop\\\\Smythe\\\\backend\"/*/*.js)",
+      "Bash(node -e \"require\\(''./services/deadlineReminderScheduler''\\); console.log\\(''Module loads OK''\\)\")",
+      "Bash(node -e \"require\\(''./services/emailService''\\); require\\(''./services/notificationService''\\); require\\(''./models/Organization''\\); console.log\\(''All modules OK''\\)\")",
+      "Bash(python deploy_now.py)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" -X POST \"https://noteify.org/email/\" -H \"Content-Type: application/json\" -d '{\"\"apikey\"\":\"\"test\"\",\"\"email\"\":\"\"test@test.com\"\",\"\"subject\"\":\"\"test\"\",\"\"body\"\":\"\"test\"\"}')",
+      "Bash(node -e \":*)",
+      "Bash(ls .env*)",
+      "Bash(node -e \"require\\('./config/db'\\); require\\('./controllers/userController'\\); require\\('./controllers/authController'\\); console.log\\('All modules OK'\\)\")",
+      "Bash(xargs grep:*)",
+      "Bash(find \"C:\\\\Users\\\\alone\\\\OneDrive\\\\Desktop\\\\Smythe\\\\backend\" -name \"*.js\" -type f ! -path \"*/node_modules/*\" -exec grep -l \"emailService\\\\|sendEmail\" {} \\\\;)",
+      "Bash(node -e \"require\\('./controllers/authController'\\); require\\('./controllers/boardController'\\); require\\('./services/notificationService'\\); console.log\\('All OK'\\)\")",
+      "Bash(xargs wc:*)",
+      "Bash(node -e \"const mongoose = require\\('mongoose'\\); mongoose.connect\\('mongodb://localhost:27017/taskmanager'\\).then\\(\\(\\) => { console.log\\('MONGO_OK'\\); mongoose.disconnect\\(\\); }\\).catch\\(e => console.log\\('MONGO_FAIL:', e.message\\)\\);\")",
+      "Bash(timeout 8 bash -c 'cd \"C:\\\\Users\\\\manoh\\\\Downloads\\\\smythe-task-manager-main\\\\backend\" && node -e \"const mongoose = require\\(\\\\\"mongoose\\\\\"\\); mongoose.connect\\(\\\\\"mongodb://localhost:27017/taskmanager\\\\\", {serverSelectionTimeoutMS: 5000}\\).then\\(\\(\\) => { console.log\\(\\\\\"MONGO_OK\\\\\"\\); process.exit\\(0\\); }\\).catch\\(e => { console.log\\(\\\\\"MONGO_FAIL:\\\\\", e.message\\); process.exit\\(1\\); }\\);\"')",
+      "Bash(curl -s -X POST http://localhost:5000/api/auth/register -H \"Content-Type: application/json\" -d '{\"name\":\"Admin User\",\"email\":\"creator@smythe.local\",\"password\":\"SmytheDemo123!\",\"organizationName\":\"Smythe Demo\"}')",
+      "Bash(grep -E \"\\\\.\\(js|jsx\\)$\")"
+    ]
+  }
+}
