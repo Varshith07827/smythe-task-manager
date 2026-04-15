@@ -28,6 +28,7 @@ async function getAppBranding(organizationId) {
       : await Organization.findOne().select('branding').lean();
     return {
       appTitle: org?.branding?.appTitle || 'Smythe',
+<<<<<<< HEAD
       tagline: org?.branding?.tagline || '',
       logoUrl: org?.branding?.logoUrl || '',
       logoShape: org?.branding?.logoShape || 'rounded',
@@ -49,6 +50,12 @@ async function getAppBranding(organizationId) {
       sidebarColor: '#1a1a2e',
       accentColor: '#0a84ff'
     };
+=======
+      accentColor: org?.branding?.accentColor || '#0a84ff'
+    };
+  } catch {
+    return { appTitle: 'Smythe', accentColor: '#0a84ff' };
+>>>>>>> 4a2c44b9f852ac127d3b4c323269b1fa2d355676
   }
 }
 

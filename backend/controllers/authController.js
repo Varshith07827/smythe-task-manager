@@ -103,8 +103,11 @@ const authController = {
         'Confirm your registration',
         `Hi ${name.trim()},\n\nYour confirmation code is:\n\n${code}\n\nThis code expires in 15 minutes.\n\nIf you did not request this, please ignore this email.`,
         'task_assigned'
+<<<<<<< HEAD
         ,
         await emailService.getAppBranding()
+=======
+>>>>>>> 4a2c44b9f852ac127d3b4c323269b1fa2d355676
       );
 
       await emailService.send(email, 'Confirm your account', htmlBody);
@@ -132,6 +135,7 @@ const authController = {
       const existing = await User.findOne({ email: pending.email });
       if (existing) return res.status(400).json({ error: 'Email already registered' });
 
+<<<<<<< HEAD
       // Find the default organization (first org in DB, or the one admins belong to)
       let org = await Organization.findOne().sort({ createdAt: 1 });
 
@@ -145,11 +149,15 @@ const authController = {
       }
 
       // Create user as a regular 'user' role and add to existing org
+=======
+      // Create user and organization
+>>>>>>> 4a2c44b9f852ac127d3b4c323269b1fa2d355676
       const user = new User({
         name: pending.name,
         email: pending.email,
         password: pending.password,
         phone: pending.phone || undefined,
+<<<<<<< HEAD
         role: 'user',
         status: 'active',
         organization: org._id
@@ -161,16 +169,37 @@ const authController = {
         $push: { members: { user: user._id, role: 'user' } }
       });
 
+=======
+        role: 'admin',
+        status: 'active'
+      });
+      await user.save();
+
+      const org = await Organization.create({
+        name: pending.organizationName || `${pending.name}'s Organization`,
+        creator: user._id,
+        members: [{ user: user._id, role: 'admin' }],
+        inviteCode: crypto.randomBytes(8).toString('hex')
+      });
+
+      user.organization = org._id;
+      await user.save({ validateBeforeSave: false });
+
+>>>>>>> 4a2c44b9f852ac127d3b4c323269b1fa2d355676
       pendingRegistrations.delete(email.toLowerCase());
 
       const token = generateToken(user._id);
 
       // Send welcome email to new user
+<<<<<<< HEAD
       const branding = await emailService.getAppBranding(org._id);
       const appName = branding.siteTitle || branding.appTitle || 'Smythe';
       const logoMarkup = branding.logoUrl
         ? `<img src="${branding.logoUrl}" alt="${appName}" style="width:${Math.max(24, Math.min(branding.logoSize || 48, 120))}px;height:${Math.max(24, Math.min(branding.logoSize || 48, 120))}px;object-fit:contain;border-radius:${branding.logoShape === 'circle' ? '999px' : branding.logoShape === 'square' ? '6px' : '14px'};display:block;margin:0 auto 16px;" />`
         : `<div style="width:${Math.max(40, Math.min(branding.logoSize || 48, 120))}px;height:${Math.max(40, Math.min(branding.logoSize || 48, 120))}px;background:${branding.accentColor || '#0a84ff'};border-radius:${branding.logoShape === 'circle' ? '999px' : branding.logoShape === 'square' ? '6px' : '14px'};display:inline-flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;color:#fff;margin:0 auto 16px;">${appName[0] || 'S'}</div>`;
+=======
+      const appName = 'Smythe';
+>>>>>>> 4a2c44b9f852ac127d3b4c323269b1fa2d355676
       const welcomeHtml = `<!DOCTYPE html>
 <html>
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
@@ -178,6 +207,7 @@ const authController = {
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f7;padding:40px 20px">
     <tr><td align="center">
       <table width="540" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08)">
+<<<<<<< HEAD
         <tr><td style="background:linear-gradient(135deg,${branding.sidebarColor || '#1a1a2e'} 0%,${branding.accentColor || '#0a84ff'} 100%);padding:40px;text-align:center">
           ${logoMarkup}
           <h1 style="color:#ffffff;font-size:26px;font-weight:700;margin:0;letter-spacing:-0.5px">Welcome to ${appName}!</h1>
@@ -199,6 +229,30 @@ const authController = {
           </div>
           <p style="color:#6e6e73;font-size:13px;margin:24px 0 0;padding-top:20px;border-top:1px solid #e5e5ea">
             Thank you
+=======
+        <tr><td style="background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);padding:40px;text-align:center">
+          <div style="width:52px;height:52px;background:#0a84ff;border-radius:14px;display:inline-flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;color:#fff;margin-bottom:16px">${appName[0]}</div>
+          <h1 style="color:#ffffff;font-size:26px;font-weight:700;margin:0;letter-spacing:-0.5px">Welcome to ${appName}!</h1>
+          <p style="color:rgba(255,255,255,0.6);margin:8px 0 0;font-size:15px">Your account is ready</p>
+        </td></tr>
+        <tr><td style="padding:36px 40px">
+          <p style="color:#1d1d1f;font-size:16px;margin:0 0 12px">Hi <strong>${pending.name}</strong>,</p>
+          <p style="color:#6e6e73;font-size:15px;line-height:1.6;margin:0 0 24px">
+            Your account has been created successfully. You are the admin of your new organization
+            <strong style="color:#1d1d1f">${org.name}</strong>.
+          </p>
+          <div style="background:#f5f5f7;border-radius:12px;padding:20px;margin-bottom:24px">
+            <p style="margin:0 0 8px;font-size:13px;font-weight:600;color:#6e6e73;text-transform:uppercase;letter-spacing:0.5px">Your account</p>
+            <p style="margin:0 0 4px;font-size:14px;color:#1d1d1f"><strong>Name:</strong> ${pending.name}</p>
+            <p style="margin:0 0 4px;font-size:14px;color:#1d1d1f"><strong>Email:</strong> ${pending.email}</p>
+            ${pending.phone ? `<p style="margin:0;font-size:14px;color:#1d1d1f"><strong>Phone:</strong> ${pending.phone}</p>` : ''}
+          </div>
+          <p style="color:#6e6e73;font-size:14px;line-height:1.6;margin:0 0 24px">
+            Get started by creating your first project board and inviting your team members.
+          </p>
+          <p style="color:#6e6e73;font-size:13px;margin:24px 0 0;padding-top:20px;border-top:1px solid #e5e5ea">
+            If you didn't create this account, please contact support immediately.
+>>>>>>> 4a2c44b9f852ac127d3b4c323269b1fa2d355676
           </p>
         </td></tr>
       </table>
@@ -209,12 +263,18 @@ const authController = {
 
       emailService.send(pending.email, `Welcome to ${appName}!`, welcomeHtml).catch(() => {});
 
+<<<<<<< HEAD
       // Notify all admin(s) in the DB about the new signup
       const allAdmins = await User.find({ role: 'admin', status: 'active' })
+=======
+      // Notify all existing admins across the platform about the new signup
+      const allAdmins = await User.find({ role: 'admin', status: 'active', _id: { $ne: user._id } })
+>>>>>>> 4a2c44b9f852ac127d3b4c323269b1fa2d355676
         .select('email name').lean();
 
       if (allAdmins.length) {
         const adminNotifyHtml = emailService.buildNotificationEmail(
+<<<<<<< HEAD
           'New User Signed Up',
           `A new user has signed up on ${appName}.\n\nName: ${pending.name}\nEmail: ${pending.email}${pending.phone ? `\nPhone: ${pending.phone}` : ''}\nRegistered: ${new Date().toLocaleString()}`,
           'task_assigned',
@@ -222,6 +282,14 @@ const authController = {
         );
         for (const admin of allAdmins) {
           emailService.send(admin.email, `${appName} - New User Signed Up: ${pending.name}`, adminNotifyHtml).catch(() => {});
+=======
+          'New User Registered',
+          `A new account has been created on ${appName}.\n\nName: ${pending.name}\nEmail: ${pending.email}${pending.phone ? `\nPhone: ${pending.phone}` : ''}\nOrganization: ${org.name}\nRegistered: ${new Date().toLocaleString()}`,
+          'task_assigned'
+        );
+        for (const admin of allAdmins) {
+          emailService.send(admin.email, `${appName} - New User Registered: ${pending.name}`, adminNotifyHtml).catch(() => {});
+>>>>>>> 4a2c44b9f852ac127d3b4c323269b1fa2d355676
         }
       }
 

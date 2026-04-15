@@ -31,7 +31,10 @@ router.post('/me/password-support', authenticate, userController.requestPassword
 router.patch('/:id/notification-preferences', authenticate, authorize('admin'), userController.updateMemberNotificationPreferences);
 router.patch('/:id/role', authenticate, authorize('admin'), userController.changeRole);
 router.patch('/:id/status', authenticate, authorize('admin'), userController.changeStatus);
+<<<<<<< HEAD
 router.patch('/:id/restore', authenticate, authorize('admin'), userController.restoreUser);
+=======
+>>>>>>> 4a2c44b9f852ac127d3b4c323269b1fa2d355676
 router.delete('/:id', authenticate, authorize('admin'), userController.removeUser);
 
 module.exports = router;
