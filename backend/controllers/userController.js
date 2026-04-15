@@ -1,12 +1,9 @@
 const User = require('../models/User');
 const Organization = require('../models/Organization');
-<<<<<<< HEAD
 const Board = require('../models/Board');
 const Task = require('../models/Task');
 const ActivityLog = require('../models/ActivityLog');
 const activityService = require('../services/activityService');
-=======
->>>>>>> 4a2c44b9f852ac127d3b4c323269b1fa2d355676
 
 const userController = {
   async getOrgMembers(req, res) {
@@ -27,11 +24,7 @@ const userController = {
         organization: req.user.organization,
         status: { $ne: 'inactive' }
       })
-<<<<<<< HEAD
         .select('name email avatar status role')
-=======
-        .select('name email avatar status')
->>>>>>> 4a2c44b9f852ac127d3b4c323269b1fa2d355676
         .sort({ name: 1 });
       res.json(users);
     } catch (err) {
@@ -87,7 +80,6 @@ const userController = {
     try {
       const userId = req.params.id;
 
-<<<<<<< HEAD
       const user = await User.findById(userId).select('name email role status organization');
       if (!user || user.organization?.toString() !== req.user.organization?.toString()) {
         return res.status(404).json({ error: 'User not found' });
@@ -106,8 +98,6 @@ const userController = {
         );
       }
 
-=======
->>>>>>> 4a2c44b9f852ac127d3b4c323269b1fa2d355676
       await Organization.findByIdAndUpdate(req.user.organization, {
         $pull: { members: { user: userId } }
       });
@@ -117,7 +107,6 @@ const userController = {
         organization: null
       });
 
-<<<<<<< HEAD
       const taskIds = affectedTasks.map(task => task._id);
       const removalLogs = affectedBoards.length > 0 ? affectedBoards : [null];
       for (const boardId of removalLogs) {
@@ -215,9 +204,6 @@ const userController = {
         message: 'User restored',
         restoredTasks: taskIds.length
       });
-=======
-      res.json({ message: 'User removed from the organization' });
->>>>>>> 4a2c44b9f852ac127d3b4c323269b1fa2d355676
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
