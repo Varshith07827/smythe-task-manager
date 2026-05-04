@@ -9,9 +9,9 @@ const checkBoardAccess = (requiredLevel = 'view') => {
       const board = await Board.findById(boardId);
       if (!board) return res.status(404).json({ error: 'Board not found' });
 
-      // Block access to archived boards except for restore operations
-      const isRestoreRoute = req.path?.endsWith('/restore') || req.originalUrl?.includes('/restore');
-      if (board.archived && !isRestoreRoute) {
+      // Block access to archived boards except for restore and permanent delete operations
+      const isRestoreOrDeleteRoute = req.path?.endsWith('/restore') || req.originalUrl?.includes('/restore') || req.path?.endsWith('/permanent') || req.originalUrl?.includes('/permanent');
+      if (board.archived && !isRestoreOrDeleteRoute) {
         return res.status(404).json({ error: 'Board not found' });
       }
 
