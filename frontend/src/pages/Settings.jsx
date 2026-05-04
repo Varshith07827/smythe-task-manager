@@ -64,6 +64,7 @@ export default function Settings() {
   }, [activeTab, loadMembers, user]);
 
   const [lastInvite, setLastInvite] = useState(null);
+  const [userSearch, setUserSearch] = useState('');
 
   const handleInvite = async (e) => {
     e.preventDefault();
@@ -226,10 +227,23 @@ export default function Settings() {
 
           {/* Users */}
           <CollapsibleCard title={`Team users (${members.length})`} defaultOpen>
+            <div style={{ padding: '0 16px 12px' }}>
+              <input 
+                className="form-input search-input" 
+                placeholder="Search users by name or email..." 
+                value={userSearch}
+                onChange={e => setUserSearch(e.target.value)}
+                style={{ width: '100%', maxWidth: 300 }}
+              />
+            </div>
             {members.length === 0 ? (
-              <p style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>No team users yet.</p>
+              <p style={{ fontSize: 13, color: 'var(--text-tertiary)', padding: '0 16px' }}>No team users yet.</p>
             ) : (
-              members.map(m => {
+              members.filter(m => 
+                !userSearch || 
+                m.name.toLowerCase().includes(userSearch.toLowerCase()) || 
+                m.email.toLowerCase().includes(userSearch.toLowerCase())
+              ).map(m => {
                 const mp = normalizeNotificationPrefs(m.notificationPreferences);
                 const notifyBusy = savingMemberNotifyId === m._id;
                 return (
