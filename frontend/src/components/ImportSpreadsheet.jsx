@@ -128,7 +128,18 @@ export default function ImportSpreadsheet({ onImported, existingBoardId }) {
   };
 
   const updateColConfig = (idx, updates) => {
-    setColumnConfig(prev => prev.map((c, i) => i === idx ? { ...c, ...updates } : c));
+    setColumnConfig(prev => {
+      const newConfig = [...prev];
+      if (updates.mapping && !['custom', 'skip'].includes(updates.mapping)) {
+        newConfig.forEach((c, i) => {
+          if (i !== idx && c.mapping === updates.mapping) {
+            newConfig[i] = { ...c, mapping: 'custom' };
+          }
+        });
+      }
+      newConfig[idx] = { ...newConfig[idx], ...updates };
+      return newConfig;
+    });
   };
 
   const handleImport = async () => {
