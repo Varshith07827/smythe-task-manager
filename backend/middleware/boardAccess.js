@@ -1,3 +1,5 @@
+const Board = require('../models/Board');
+
 const checkBoardAccess = (requiredLevel = 'view') => {
   return async (req, res, next) => {
     try {

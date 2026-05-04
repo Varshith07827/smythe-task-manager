@@ -17,8 +17,7 @@ initSocket(server);
 
 // Middleware
 app.use(helmet());
-const ALLOWED_ORIGIN = process.env.CLIENT_URL || 'http://localhost:5173';
-app.use(cors({ origin: ALLOWED_ORIGIN, credentials: true }));
+app.use(cors({ origin: true, credentials: true })); // origin: true allows any origin in development
 app.use(morgan('dev'));
 app.use(express.json({ limit: '10mb' }));
 
