@@ -243,32 +243,30 @@ export default function Dashboard() {
           <h2 className="page-section-title page-section-title-lg">My Workspace</h2>
         </div>
         <div className="page-section-actions">
-          {(user?.role === 'admin') && (
-            <Dropdown
-              buttonClassName="btn btn-primary"
-              align="end"
-              buttonContent={
-                <>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
-                  New
-                  <svg className="dropdown-chevron" width="10" height="10" viewBox="0 0 10 6" fill="none"><path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
-                </>
-              }
-            >
-              {(close) => (
-                <>
-                  <button type="button" className="dropdown-item" onClick={() => { setShowCreate(true); close(); }}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M15 3v18"/></svg>
-                    New project
-                  </button>
-                  <button type="button" className="dropdown-item" onClick={() => { setShowImport(true); close(); }}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                    Import spreadsheet
-                  </button>
-                </>
-              )}
-            </Dropdown>
-          )}
+          <Dropdown
+            buttonClassName="btn btn-primary"
+            align="end"
+            buttonContent={
+              <>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
+                New
+                <svg className="dropdown-chevron" width="10" height="10" viewBox="0 0 10 6" fill="none"><path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
+              </>
+            }
+          >
+            {(close) => (
+              <>
+                <button type="button" className="dropdown-item" onClick={() => { setShowCreate(true); close(); }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M15 3v18"/></svg>
+                  New project
+                </button>
+                <button type="button" className="dropdown-item" onClick={() => { setShowImport(true); close(); }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                  Import spreadsheet
+                </button>
+              </>
+            )}
+          </Dropdown>
         </div>
       </motion.div>
 
@@ -369,14 +367,8 @@ export default function Dashboard() {
           <h3>No projects yet</h3>
           <p>Create your first project to start managing tasks</p>
           <div className="empty-state-actions">
-            {(user?.role === 'admin') ? (
-              <>
-                <button type="button" className="btn btn-primary" onClick={() => setShowCreate(true)}>Create project</button>
-                <button type="button" className="btn btn-secondary" onClick={() => setShowImport(true)}>Import spreadsheet</button>
-              </>
-            ) : (
-              <p style={{ color: 'var(--text-tertiary)', fontSize: 13 }}>Contact your admin to get assigned to a project.</p>
-            )}
+            <button type="button" className="btn btn-primary" onClick={() => setShowCreate(true)}>Create project</button>
+            <button type="button" className="btn btn-secondary" onClick={() => setShowImport(true)}>Import spreadsheet</button>
           </div>
         </motion.div>
       ) : (
@@ -417,7 +409,7 @@ export default function Dashboard() {
                         <line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 00-1.11-1.79l-1.78-.9A2 2 0 0115 10.76V6h1a2 2 0 000-4H8a2 2 0 000 4h1v4.76a2 2 0 01-1.11 1.79l-1.78.9A2 2 0 005 15.24z"/>
                       </svg>
                     </button>
-                    {user?.role === 'admin' && (
+                    {(user?.role === 'admin' || board.createdBy === user?._id) && (
                       <button
                         className="board-card-menu"
                         onClick={(e) => handleArchiveBoard(e, board._id, board.title)}

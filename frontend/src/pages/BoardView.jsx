@@ -79,7 +79,9 @@ export default function BoardView() {
     document.addEventListener('mouseup', onUp);
   };
 
-  const isManager = user?.role === 'admin';
+  const isManager = user?.role === 'admin' || 
+    (board?.createdBy?._id === user?._id) || 
+    (board?.permissions?.allowedManagers?.includes(user?._id));
 
   const loadBoard = useCallback(async () => {
     try {

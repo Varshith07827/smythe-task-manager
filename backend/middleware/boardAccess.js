@@ -12,23 +12,34 @@ const checkBoardAccess = (requiredLevel = 'view') => {
       const userId = req.user._id.toString();
       const role = req.user.role;
 
-      // Admin has full access
+      // System Admin has full access
       if (role === 'admin') {
         req.board = board;
         return next();
       }
 
-      // User role
+      const isCreator = board.createdBy && board.createdBy.toString() === userId;
+      const isManager = board.permissions?.allowedManagers?.some(id => id.toString() === userId);
+
+      // Require board admin rights for destructive/schema changes
+      if (requiredLevel === 'admin') {
+        if (isCreator || isManager) {
+          req.board = board;
+          return next();
+        }
+        return res.status(403).json({ error: 'Board admin access required' });
+      }
+
+      // User role checking for 'view' or 'edit' tasks
       if (board.permissions.visibility === 'organization') {
         req.board = board;
         return next();
       }
 
       if (board.permissions.visibility === 'restricted') {
-        const isAllowedUser = board.permissions.allowedUsers
-          .some(id => id.toString() === userId);
+        const isAllowedUser = board.permissions?.allowedUsers?.some(id => id.toString() === userId);
 
-        if (!isAllowedUser) {
+        if (!isAllowedUser && !isManager && !isCreator) {
           return res.status(403).json({ error: 'No access to this board' });
         }
       }

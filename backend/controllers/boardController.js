@@ -56,7 +56,7 @@ const boardController = {
       }
 
       const boards = await Board.find(query)
-        .select('title description color createdAt columns permissions.visibility')
+        .select('title description color createdAt columns permissions.visibility createdBy')
         .sort({ createdAt: -1 })
         .lean();
 
@@ -114,7 +114,7 @@ const boardController = {
     try {
       const orgId = req.user.organization;
       const boards = await Board.find({ organization: orgId, archived: true })
-        .select('title description color createdAt columns permissions.visibility')
+        .select('title description color createdAt columns permissions.visibility createdBy')
         .sort({ createdAt: -1 })
         .lean();
       res.json(boards);
