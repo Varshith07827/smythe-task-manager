@@ -10,9 +10,8 @@ import { motion } from 'framer-motion';
 const DEMO_PASSWORD = import.meta.env.VITE_DEMO_PASSWORD || 'SmytheDemo123!';
 
 const DEMO_ACCOUNTS = [
-  { label: 'Creator', email: 'creator@smythe.local' },
-  { label: 'Manager', email: 'morgan@smythe.local' },
-  { label: 'User', email: 'uma@smythe.local' }
+  { label: 'Admin', email: 'alonewalker07827@gmail.com' },
+  { label: 'User', email: 'marcus@smythe.app', password: 'User@123' }
 ];
 
 const friendlyError = (err) => {
@@ -33,6 +32,7 @@ export default function Login() {
   const [otpCode, setOtpCode] = useState('');
   const [otpSent, setOtpSent] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [notOnTeamError, setNotOnTeamError] = useState(false);
 
   // Support modal state
   const [showSupport, setShowSupport] = useState(false);
@@ -73,6 +73,7 @@ export default function Login() {
   const handlePasswordLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
+    setNotOnTeamError(false);
     try {
       await login(email, password);
       navigate('/');
@@ -87,12 +88,17 @@ export default function Login() {
     e.preventDefault();
     if (!email) return;
     setLoading(true);
+    setNotOnTeamError(false);
     try {
       await authApi.requestOtp(email);
       setOtpSent(true);
       alert.success('Login code sent to your email');
     } catch (err) {
-      alert.error(friendlyError(err));
+      if (err.response?.data?.error === 'No account found with this email') {
+        setNotOnTeamError(true);
+      } else {
+        alert.error(friendlyError(err));
+      }
     } finally {
       setLoading(false);
     }
@@ -112,10 +118,11 @@ export default function Login() {
     }
   };
 
-  const handleDemoLogin = async (demoEmail) => {
+  const handleDemoLogin = async (account) => {
     setLoading(true);
+    setNotOnTeamError(false);
     try {
-      await login(demoEmail, DEMO_PASSWORD);
+      await login(account.email, account.password || DEMO_PASSWORD);
       navigate('/');
     } catch (err) {
       alert.error(friendlyError(err));
@@ -141,20 +148,18 @@ export default function Login() {
         </div>
 
         <nav className="login-sidebar-nav">
+          <Link to="/register" className="login-sidebar-link">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/>
+            </svg>
+            <span>Sign Up</span>
+          </Link>
           <button type="button" className="login-sidebar-link" style={{ background: 'none', border: 'none', cursor: 'pointer', width: '100%', textAlign: 'left' }} onClick={openSupport}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
             </svg>
             <span>Support</span>
           </button>
-          {branding.allowSignup && (
-            <Link to="/register" className="login-sidebar-link">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/>
-              </svg>
-              <span>Sign Up</span>
-            </Link>
-          )}
         </nav>
 
         <div className="login-sidebar-footer">
@@ -164,7 +169,8 @@ export default function Login() {
 
       {/* Main area */}
       <main className="login-main">
-        <header className="login-header">
+        <header className="login-header" style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+          <Link to="/register" className="login-header-link" style={{ textDecoration: 'none' }}>Sign Up</Link>
           <button type="button" className="login-header-link" style={{ background: 'none', border: 'none', cursor: 'pointer' }} onClick={openSupport}>Support</button>
         </header>
 
@@ -181,14 +187,14 @@ export default function Login() {
               <button
                 type="button"
                 className={`auth-tab ${tab === 'otp' ? 'active' : ''}`}
-                onClick={() => { setTab('otp'); setOtpSent(false); setOtpCode(''); }}
+                onClick={() => { setTab('otp'); setOtpSent(false); setOtpCode(''); setNotOnTeamError(false); }}
               >
                 Login with Code
               </button>
               <button
                 type="button"
                 className={`auth-tab ${tab === 'password' ? 'active' : ''}`}
-                onClick={() => setTab('password')}
+                onClick={() => { setTab('password'); setNotOnTeamError(false); }}
               >
                 Use Password
               </button>
@@ -203,7 +209,7 @@ export default function Login() {
                     className="form-input"
                     placeholder="you@example.com"
                     value={email}
-                    onChange={e => setEmail(e.target.value)}
+                    onChange={e => { setEmail(e.target.value); setNotOnTeamError(false); }}
                     required
                     autoComplete="email"
                   />
@@ -211,6 +217,14 @@ export default function Login() {
                 <button type="submit" className="btn btn-primary" disabled={loading}>
                   {loading ? 'Sending...' : 'Send Login Code'}
                 </button>
+                {notOnTeamError && (
+                  <div style={{ marginTop: 16, padding: 16, background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
+                    <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 12 }}>
+                      You are not on the team.
+                    </p>
+                    <Link to="/register" className="btn btn-secondary btn-sm" style={{ width: '100%' }}>Sign Up Now</Link>
+                  </div>
+                )}
               </form>
             )}
 
@@ -282,22 +296,22 @@ export default function Login() {
               <div className="auth-quick-login">
                 <p className="auth-quick-login-label">Quick login (dev only)</p>
                 <div className="auth-quick-login-buttons">
-                  {DEMO_ACCOUNTS.map(({ label, email: demoEmail }) => (
+                  {DEMO_ACCOUNTS.map((account) => (
                     <button
-                      key={demoEmail}
+                      key={account.email}
                       type="button"
                       className="btn btn-secondary btn-sm"
                       disabled={loading}
-                      onClick={() => handleDemoLogin(demoEmail)}
+                      onClick={() => handleDemoLogin(account)}
                     >
-                      Login as {label}
+                      Login as {account.label}
                     </button>
                   ))}
                 </div>
               </div>
             )}
 
-            <div className="auth-footer">
+            <div className="auth-footer" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
               <button type="button" onClick={openSupport} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', fontSize: 13, padding: 0 }}>Help with Login?</button>
             </div>
           </motion.div>

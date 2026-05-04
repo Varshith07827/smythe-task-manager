@@ -31,6 +31,8 @@ export default function Dashboard() {
   const [boards, setBoards] = useState([]);
   const [archivedBoards, setArchivedBoards] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [retryCount, setRetryCount] = useState(0);
   const [showCreate, setShowCreate] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
@@ -99,7 +101,7 @@ export default function Dashboard() {
     } catch { return boardList; }
   }, [orderKey]);
 
-  useEffect(() => { loadBoards(); }, []);
+  useEffect(() => { loadBoards(); }, [retryCount]);
   useEffect(() => { localStorage.setItem('smythe:showStats', JSON.stringify(showStats)); }, [showStats]);
 
   // Sync pins when changed from sidebar
@@ -111,11 +113,19 @@ export default function Dashboard() {
 
   const loadBoards = async () => {
     try {
+      setLoading(true);
+      setError(null);
       const res = await boardsApi.getAll();
       setBoards(applyStoredOrder(res.data));
-    } catch {
-      alert.error('Unable to load your projects. Please refresh.');
-    } finally {
+      setLoading(false);
+    } catch (err) {
+      if (retryCount < 2) {
+        setTimeout(() => setRetryCount(c => c + 1), 1000);
+        return;
+      }
+      const errorMsg = err.response?.data?.error || err.message || 'Unknown error';
+      setError(`Unable to load projects: ${errorMsg}`);
+      alert.error(`Unable to load projects: ${errorMsg}`);
       setLoading(false);
     }
   };
@@ -206,7 +216,24 @@ export default function Dashboard() {
     ].filter(d => d.value > 0);
   }, [boards, archivedBoards]);
 
-  if (loading) return <div className="loading-spinner"><div className="spinner" /></div>;
+  if (loading && !error) return <div className="loading-spinner"><div className="spinner" /></div>;
+
+  if (error) {
+    return (
+      <div className="empty-state" style={{ marginTop: 60 }}>
+        <div className="empty-state-icon">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--red)" strokeWidth="1.5" strokeLinecap="round">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+        </div>
+        <h3 style={{ color: 'var(--red)' }}>Connection Error</h3>
+        <p>{error}</p>
+        <div className="empty-state-actions">
+          <button type="button" className="btn btn-primary" onClick={() => setRetryCount(0)}>Try Again</button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <motion.div variants={container} initial="hidden" animate="show">

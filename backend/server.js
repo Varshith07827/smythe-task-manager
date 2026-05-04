@@ -27,7 +27,7 @@ app.set('trust proxy', 1);
 // Rate limiting (skip auth login/register so dev quick-login and retries are not blocked)
 app.use('/api/', rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 300,
+  max: 30000,
   validate: { xForwardedForHeader: false },
   skip: (req) => {
     const u = req.originalUrl || '';

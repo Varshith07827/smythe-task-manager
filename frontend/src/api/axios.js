@@ -20,7 +20,8 @@ api.interceptors.response.use(
     const reqUrl = error.config?.url || '';
     const isAuthAttempt =
       reqUrl.includes('/auth/login') ||
-      reqUrl.includes('/auth/register');
+      reqUrl.includes('/auth/register') ||
+      reqUrl.includes('/auth/otp/');
 
     if (status === 401 && !isAuthAttempt) {
       localStorage.removeItem('token');

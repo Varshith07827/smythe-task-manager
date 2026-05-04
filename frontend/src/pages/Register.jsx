@@ -96,7 +96,15 @@ export default function Register() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
           >
-            {step === 'form' ? (
+            {!branding.allowSignup ? (
+              <div style={{ textAlign: 'center', padding: '20px 0' }}>
+                <h2 style={{ marginBottom: 12 }}>Registration Disabled</h2>
+                <p style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: 24 }}>
+                  Public sign-up is currently disabled for this organization. Please contact an administrator to be invited.
+                </p>
+                <Link to="/login" className="btn btn-primary" style={{ display: 'inline-block', width: '100%' }}>Back to Login</Link>
+              </div>
+            ) : step === 'form' ? (
               <>
                 <h2 style={{ textAlign: 'center', marginBottom: 6 }}>Sign Up</h2>
                 <p style={{ textAlign: 'center', fontSize: 13, color: 'var(--text-tertiary)', marginBottom: 20 }}>
