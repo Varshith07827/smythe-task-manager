@@ -20,7 +20,7 @@ const userController = {
         organization: req.user.organization,
         status: { $ne: 'inactive' }
       })
-        .select('name email avatar status')
+        .select('name email avatar status role')
         .sort({ name: 1 });
       res.json(users);
     } catch (err) {

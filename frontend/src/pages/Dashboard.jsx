@@ -465,28 +465,32 @@ export default function Dashboard() {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
                       <h3 style={{ opacity: 0.7 }}>{board.title}</h3>
                       <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                        <button
-                          className="btn btn-ghost btn-xs"
-                          onClick={(e) => handleRestoreBoard(e, board._id)}
-                          title="Restore project"
-                          style={{ fontSize: 11, gap: 4 }}
-                        >
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                            <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 105.64-12.5L1 10"/>
-                          </svg>
-                          Restore
-                        </button>
-                        <button
-                          className="btn btn-ghost btn-xs"
-                          onClick={(e) => handleDeleteBoard(e, board._id, board.title)}
-                          title="Delete permanently"
-                          style={{ fontSize: 11, gap: 4, color: 'var(--red)' }}
-                        >
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                            <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
-                          </svg>
-                          Delete
-                        </button>
+                        {(user?.role === 'admin' || board.createdBy === user?._id) && (
+                          <>
+                            <button
+                              className="btn btn-ghost btn-xs"
+                              onClick={(e) => handleRestoreBoard(e, board._id)}
+                              title="Restore project"
+                              style={{ fontSize: 11, gap: 4 }}
+                            >
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                                <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 105.64-12.5L1 10"/>
+                              </svg>
+                              Restore
+                            </button>
+                            <button
+                              className="btn btn-ghost btn-xs"
+                              onClick={(e) => handleDeleteBoard(e, board._id, board.title)}
+                              title="Delete permanently"
+                              style={{ fontSize: 11, gap: 4, color: 'var(--red)' }}
+                            >
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                                <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                              </svg>
+                              Delete
+                            </button>
+                          </>
+                        )}
                       </div>
                     </div>
                     <p style={{ opacity: 0.6 }}>{board.description || 'No description'}</p>

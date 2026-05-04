@@ -113,7 +113,19 @@ const boardController = {
   async getArchived(req, res) {
     try {
       const orgId = req.user.organization;
-      const boards = await Board.find({ organization: orgId, archived: true })
+      const query = { organization: orgId, archived: true };
+
+      if (req.user.role !== 'admin') {
+        const userId = req.user._id;
+        query.$or = [
+          { 'permissions.visibility': 'organization' },
+          { 'permissions.allowedUsers': userId },
+          { 'permissions.allowedManagers': userId },
+          { createdBy: userId }
+        ];
+      }
+
+      const boards = await Board.find(query)
         .select('title description color createdAt columns permissions.visibility createdBy')
         .sort({ createdAt: -1 })
         .lean();

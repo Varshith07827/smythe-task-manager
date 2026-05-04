@@ -234,7 +234,7 @@ export default function Settings() {
                 const notifyBusy = savingMemberNotifyId === m._id;
                 return (
                   <div key={m._id} className="settings-member-row">
-                    <div className="settings-member-info">
+                    <div className="settings-member-info" style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 200 }}>
                       <div className="user-avatar" style={{ flexShrink: 0 }}>{initials(m.name)}</div>
                       <div style={{ minWidth: 0 }}>
                         <div style={{ fontSize: 14, fontWeight: 550, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.name}</div>
@@ -252,7 +252,7 @@ export default function Settings() {
                     ) : (
                       <span style={{ width: 90, fontSize: 12, fontWeight: 550, color: 'var(--text-secondary)', textTransform: 'capitalize', flexShrink: 0, textAlign: 'center' }}>{m.role}</span>
                     )}
-                    <div className="settings-member-right">
+                    <div className="settings-member-actions">
                       {isAdmin && (
                         <div className="settings-member-notify-toggles">
                           {['inApp', 'email', 'progressDigest'].map(key => (
