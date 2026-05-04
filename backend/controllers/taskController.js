@@ -244,6 +244,7 @@ const taskController = {
         { archived: true },
         { new: true }
       );
+      if (!task) return res.status(404).json({ error: 'Task not found' });
       socketService.taskDeleted(task.board.toString(), task._id, req.user);
       res.json({ message: 'Task archived' });
     } catch (err) {
@@ -557,9 +558,8 @@ const taskController = {
       if (dailyReminder !== undefined) Object.assign(task.taskNotifications.dailyReminder, dailyReminder);
       if (intervalReminder !== undefined) Object.assign(task.taskNotifications.intervalReminder, intervalReminder);
       if (urgentMode !== undefined) Object.assign(task.taskNotifications.urgentMode, urgentMode);
-      await task.save();
 
-      // Log to history
+      // Log to history then save once
       activityService.addTaskHistory(task, {
         changedBy: req.user._id,
         action: 'notification_updated',

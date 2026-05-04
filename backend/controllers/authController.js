@@ -361,7 +361,7 @@ const authController = {
       res.status(201).json({
         message: 'User invited',
         user: { _id: user._id, name: user.name, email: user.email, role: user.role },
-        tempPassword
+        tempPassword // Shown to inviting admin in Settings UI as a fallback if email fails
       });
     } catch (err) {
       res.status(500).json({ error: err.message });

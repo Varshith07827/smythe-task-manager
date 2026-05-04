@@ -1,5 +1,3 @@
-const Board = require('../models/Board');
-
 const checkBoardAccess = (requiredLevel = 'view') => {
   return async (req, res, next) => {
     try {
@@ -8,6 +6,12 @@ const checkBoardAccess = (requiredLevel = 'view') => {
 
       const board = await Board.findById(boardId);
       if (!board) return res.status(404).json({ error: 'Board not found' });
+
+      // Block access to archived boards except for restore operations
+      const isRestoreRoute = req.path?.endsWith('/restore') || req.originalUrl?.includes('/restore');
+      if (board.archived && !isRestoreRoute) {
+        return res.status(404).json({ error: 'Board not found' });
+      }
 
       const userId = req.user._id.toString();
       const role = req.user.role;

@@ -17,7 +17,8 @@ initSocket(server);
 
 // Middleware
 app.use(helmet());
-app.use(cors({ origin: true, credentials: true })); // origin: true allows any origin in development
+const ALLOWED_ORIGIN = process.env.CLIENT_URL || 'http://localhost:5173';
+app.use(cors({ origin: ALLOWED_ORIGIN, credentials: true }));
 app.use(morgan('dev'));
 app.use(express.json({ limit: '10mb' }));
 
@@ -27,7 +28,7 @@ app.set('trust proxy', 1);
 // Rate limiting (skip auth login/register so dev quick-login and retries are not blocked)
 app.use('/api/', rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 30000,
+  max: 300,
   validate: { xForwardedForHeader: false },
   skip: (req) => {
     const u = req.originalUrl || '';

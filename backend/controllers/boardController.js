@@ -43,7 +43,7 @@ const boardController = {
       if (role === 'admin') {
         query = { organization: orgId, archived: { $ne: true } };
       } else {
-        // Regular users: only boards where they have assigned tasks
+        // Regular users: boards visible to the org, OR boards where they have assigned tasks
         const assignedBoardIds = await Task.distinct('board', {
           assignedTo: userId,
           archived: { $ne: true }
@@ -51,7 +51,13 @@ const boardController = {
         query = {
           organization: orgId,
           archived: { $ne: true },
-          _id: { $in: assignedBoardIds }
+          $or: [
+            { 'permissions.visibility': 'organization' },
+            { _id: { $in: assignedBoardIds } },
+            { 'permissions.allowedUsers': userId },
+            { 'permissions.allowedManagers': userId },
+            { createdBy: userId }
+          ]
         };
       }
 
