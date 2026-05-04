@@ -125,36 +125,18 @@ export default function Layout() {
     <div className="app-layout">
       <aside id="app-sidebar" className={`sidebar${effectiveOpen ? ' sidebar--open' : ''}`} aria-label="Main navigation">
         <div className="sidebar-brand">
-          <div className="sidebar-brand-left">
-            {branding.logoUrl ? (
-              <img src={branding.logoUrl} alt={appName} className="sidebar-brand-logo" style={{
-                height: 32, width: 32, objectFit: 'cover',
-                borderRadius: branding.logoShape === 'circle' ? '50%' : branding.logoShape === 'square' ? 4 : 8
-              }} />
-            ) : (
-              <span className="sidebar-brand-mark">{appName[0]}</span>
-            )}
-            <div className="sidebar-brand-text">
-              <span className="sidebar-brand-name">{appName}</span>
-              <span className="sidebar-brand-tagline">{branding.tagline || 'Task Management'}</span>
-            </div>
+          {branding.logoUrl ? (
+            <img src={branding.logoUrl} alt={appName} className="sidebar-brand-logo" style={{
+              height: 28, width: 28, objectFit: 'cover',
+              borderRadius: branding.logoShape === 'circle' ? '50%' : branding.logoShape === 'square' ? 3 : 6
+            }} />
+          ) : (
+            <span className="sidebar-brand-mark">{appName[0]}</span>
+          )}
+          <div className="sidebar-brand-text">
+            <span className="sidebar-brand-name">{appName}</span>
+            <span className="sidebar-brand-tagline">{branding.tagline || 'Task Management'}</span>
           </div>
-          <button
-            type="button"
-            className="sidebar-collapse-btn"
-            onClick={() => setSidebarOpen(v => !v)}
-            aria-expanded={effectiveOpen}
-            aria-controls="app-sidebar"
-            aria-label={effectiveOpen ? 'Collapse sidebar' : 'Expand sidebar'}
-            title={effectiveOpen ? 'Collapse' : 'Expand'}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              {effectiveOpen
-                ? <polyline points="15 18 9 12 15 6" />
-                : <polyline points="9 18 15 12 9 6" />
-              }
-            </svg>
-          </button>
         </div>
 
         <nav className="sidebar-nav">
@@ -314,6 +296,18 @@ export default function Layout() {
 
       <main className="main-content">
         <header className="main-toolbar">
+          <button
+            type="button"
+            className="main-menu-toggle"
+            onClick={() => setSidebarOpen(v => !v)}
+            aria-expanded={effectiveOpen}
+            aria-controls="app-sidebar"
+            aria-label={effectiveOpen ? 'Collapse navigation' : 'Expand navigation'}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <path d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
           <div className="main-toolbar-mobile-cluster">
             <span className="main-toolbar-mobile-brand">{appName}</span>
             <nav className="main-toolbar-mobile-nav" aria-label="Mobile">

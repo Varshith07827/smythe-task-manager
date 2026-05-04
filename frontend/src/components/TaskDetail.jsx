@@ -931,21 +931,16 @@ export default function TaskDetail({ task: initialTask, board, boardId, onClose,
       {/* Remind modal */}
       <AnimatePresence>
         {showRemindModal && (
-          <div className="modal-overlay" style={{ zIndex: 1000 }}>
-            <motion.div className="modal" style={{ maxWidth: 380 }} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}>
-              <div className="modal-header">
-                <h3>Send Reminder</h3>
-                <button className="modal-close" onClick={() => setShowRemindModal(false)}>&times;</button>
-              </div>
-              <div className="modal-body">
-                <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 14, lineHeight: 1.5 }}>
-                  Sends an immediate notification to all assignees.
-                </p>
-                <textarea className="form-input" placeholder="Optional message..." value={remindText} onChange={e => setRemindText(e.target.value)} rows={3} style={{ marginBottom: 14 }} autoFocus />
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-                  <button className="btn btn-ghost btn-sm" onClick={() => setShowRemindModal(false)}>Cancel</button>
-                  <button className="btn btn-primary btn-sm" onClick={handleRemind} disabled={sendingRemind}>{sendingRemind ? 'Sending...' : 'Send'}</button>
-                </div>
+          <div className="modal-overlay" style={{ zIndex: 1000 }} onClick={() => setShowRemindModal(false)}>
+            <motion.div className="modal" style={{ maxWidth: 380, padding: 24 }} onClick={e => e.stopPropagation()} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}>
+              <h4 style={{ marginBottom: 8, fontSize: 16 }}>Send Reminder</h4>
+              <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 14, lineHeight: 1.5 }}>
+                Sends an immediate notification to all assignees.
+              </p>
+              <textarea className="form-input" placeholder="Optional message..." value={remindText} onChange={e => setRemindText(e.target.value)} rows={3} style={{ marginBottom: 14 }} autoFocus />
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                <button className="btn btn-ghost btn-sm" onClick={() => setShowRemindModal(false)}>Cancel</button>
+                <button className="btn btn-primary btn-sm" onClick={handleRemind} disabled={sendingRemind}>{sendingRemind ? 'Sending...' : 'Send'}</button>
               </div>
             </motion.div>
           </div>

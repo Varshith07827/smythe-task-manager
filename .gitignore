@@ -28,8 +28,6 @@ logs/
 # Uploads / temp files
 uploads/
 tmp/
-<<<<<<< HEAD
-=======
 
 # Local script outputs
 debug_output.txt
@@ -38,4 +36,3 @@ deploy_output_latest.txt
 seed_output.txt
 test_branding_output.txt
 user_list.txt
->>>>>>> 4a2c44b9f852ac127d3b4c323269b1fa2d355676

@@ -152,8 +152,8 @@ export default function StatusWorkflowModal({ task, boardId, newStatus, onClose,
   };
 
   return (
-    <div className="modal-overlay">
-      <div className="modal workflow-modal" style={{ maxWidth: 500 }}>
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal workflow-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 500 }}>
         {/* Header with status indicator */}
         <div className="modal-header" style={{ gap: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>

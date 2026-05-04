@@ -13,6 +13,7 @@ export default function Register() {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
+  const [orgName, setOrgName] = useState('');
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -25,7 +26,7 @@ export default function Register() {
     e.preventDefault();
     setLoading(true);
     try {
-      await authApi.registerRequest({ name, email, phone, password });
+      await authApi.registerRequest({ name, email, phone, password, organizationName: orgName });
       alert.success('Confirmation code sent to your email');
       setStep('confirm');
     } catch (err) {
@@ -106,9 +107,9 @@ export default function Register() {
               </div>
             ) : step === 'form' ? (
               <>
-                <h2 style={{ textAlign: 'center', marginBottom: 6 }}>Sign Up</h2>
+                <h2 style={{ textAlign: 'center', marginBottom: 6 }}>Create Account</h2>
                 <p style={{ textAlign: 'center', fontSize: 13, color: 'var(--text-tertiary)', marginBottom: 20 }}>
-                  Create your account — we'll send a confirmation code to your email.
+                  We'll send a confirmation code to your email.
                 </p>
 
                 <form onSubmit={handleRequestCode}>
@@ -127,6 +128,10 @@ export default function Register() {
                   <div className="form-group">
                     <label className="form-label">Password</label>
                     <PasswordInput placeholder="Min. 6 characters" value={password} onChange={e => setPassword(e.target.value)} required minLength={6} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Organization Name <span style={{ color: 'var(--text-tertiary)', fontWeight: 400 }}>(optional)</span></label>
+                    <input type="text" className="form-input" placeholder="Your Company" value={orgName} onChange={e => setOrgName(e.target.value)} />
                   </div>
                   <button type="submit" className="btn btn-primary" disabled={loading}>
                     {loading ? 'Sending code...' : 'Continue'}
@@ -177,7 +182,7 @@ export default function Register() {
                     onClick={async () => {
                       setLoading(true);
                       try {
-                        await authApi.registerRequest({ name, email, phone, password });
+                        await authApi.registerRequest({ name, email, phone, password, organizationName: orgName });
                         alert.success('New code sent');
                       } catch { alert.error('Could not resend code'); }
                       finally { setLoading(false); }

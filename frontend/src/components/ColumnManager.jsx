@@ -188,8 +188,8 @@ export default function ColumnManager({ board, boardId, userRole, onClose, onBoa
   };
 
   return (
-    <div className="modal-overlay">
-      <div className="modal modal-lg column-manager-modal">
+    <div className="modal-overlay" onClick={handleClose}>
+      <div className="modal modal-lg column-manager-modal" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
           <h3>Manage Columns</h3>
           <button className="modal-close" onClick={handleClose}>&times;</button>

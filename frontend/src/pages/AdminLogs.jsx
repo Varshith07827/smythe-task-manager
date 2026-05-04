@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { boardsApi } from '../api/boards';
-import { usersApi } from '../api/users';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import { alert } from '../components/AlertSystem';
@@ -20,7 +19,6 @@ export default function AdminLogs() {
   const [searchText, setSearchText] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [debouncedUser, setDebouncedUser] = useState('');
-  const [restoringId, setRestoringId] = useState(null);
 
   // Redirect non-admins
   useEffect(() => {
@@ -80,26 +78,6 @@ export default function AdminLogs() {
     return icons[action] || { icon: <svg {...svgProps}><circle cx="12" cy="12" r="4" fill="currentColor" stroke="none"/></svg>, color: 'var(--text-tertiary)' };
   };
 
-  const canRestore = (log) => log.action === 'user_removed' && Boolean(log.target?.id);
-
-  const handleRestore = async (log) => {
-    if (!canRestore(log)) {
-      alert.error('Nothing to restore from this log entry');
-      return;
-    }
-
-    setRestoringId(log._id || log.id);
-    try {
-      await usersApi.restoreUser(log.target.id);
-      alert.success(`Restored ${log.target?.name || 'user'}`);
-      await loadLogs();
-    } catch (err) {
-      alert.error('Failed to restore: ' + (err.response?.data?.error || err.message));
-    } finally {
-      setRestoringId(null);
-    }
-  };
-
   const initials = (name) => name?.split(' ').map(n => n[0]).join('').toUpperCase() || '?';
 
   if (loading && logs.length === 0) return <div className="loading-spinner"><div className="spinner" /></div>;
@@ -150,17 +128,14 @@ export default function AdminLogs() {
                   <th>Action</th>
                   <th>Target</th>
                   <th>Project</th>
-                  <th style={{ width: 110 }} />
                   <th>Date</th>
                 </tr>
               </thead>
               <tbody>
                 {logs.map((log, i) => {
                   const { icon, color } = getActionIcon(log.action);
-                  const restorable = canRestore(log);
-                  const logId = log._id || log.id;
                   return (
-                    <tr key={logId || i}>
+                    <tr key={log._id || i}>
                       <td style={{ textAlign: 'center', color }}>{icon}</td>
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -191,17 +166,6 @@ export default function AdminLogs() {
                             {log.board?.title || 'View'}
                           </button>
                         ) : '—'}
-                      </td>
-                      <td style={{ textAlign: 'center' }}>
-                        {restorable ? (
-                          <button
-                            className="btn btn-secondary btn-xs"
-                            onClick={() => handleRestore(log)}
-                            disabled={restoringId === logId}
-                          >
-                            {restoringId === logId ? 'Restoring...' : 'Restore'}
-                          </button>
-                        ) : null}
                       </td>
                       <td>
                         <span style={{ fontSize: 12, color: 'var(--text-tertiary)', whiteSpace: 'nowrap' }}>

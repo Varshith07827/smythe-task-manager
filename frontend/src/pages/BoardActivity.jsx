@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { boardsApi } from '../api/boards';
 import { tasksApi } from '../api/tasks';
-import { usersApi } from '../api/users';
 import { useSocket } from '../context/SocketContext';
 import { alert } from '../components/AlertSystem';
 
@@ -137,7 +136,6 @@ export default function BoardActivity() {
     const taskId = getTaskId(entry);
     if (entry.action === 'task_updated' && entry.changes?.length > 0 && taskId) return true;
     if (entry.action === 'status_changed' && taskId) return true;
-    if (entry.action === 'user_removed' && entry.target?.id) return true;
     return false;
   };
 
@@ -178,13 +176,6 @@ export default function BoardActivity() {
           loadData();
           return;
         }
-      }
-
-      if (action === 'user_removed' && entry.target?.id) {
-        await usersApi.restoreUser(entry.target.id);
-        alert.success(`Restored ${entry.target?.name || 'user'}`);
-        loadData();
-        return;
       }
 
       alert.error('Cannot auto-restore this action');

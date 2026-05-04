@@ -40,8 +40,8 @@ export default function AddColumnModal({ boardId, onClose, onAdded }) {
   };
 
   return (
-    <div className="modal-overlay">
-      <div className="modal">
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
           <h3>Add Column</h3>
           <button className="modal-close" onClick={onClose}>&times;</button>

@@ -6,7 +6,6 @@ export const usersApi = {
   changeRole: (id, role) => api.patch(`/users/${id}/role`, { role }),
   changeStatus: (id, status) => api.patch(`/users/${id}/status`, { status }),
   removeUser: (id) => api.delete(`/users/${id}`),
-  restoreUser: (id) => api.patch(`/users/${id}/restore`),
   updateNotificationPrefs: (prefs) => api.patch('/users/me/notification-preferences', prefs),
   updateMemberNotificationPrefs: (userId, prefs) => api.patch(`/users/${userId}/notification-preferences`, prefs),
   verifyPassword: (password) => api.post('/users/me/verify-password', { password }),

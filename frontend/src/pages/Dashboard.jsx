@@ -518,8 +518,8 @@ export default function Dashboard() {
       </AnimatePresence>
 
       {showImport && (
-        <div className="modal-overlay">
-          <div className="modal modal-lg" style={{ maxWidth: 860 }}>
+        <div className="modal-overlay" onClick={() => setShowImport(false)}>
+          <div className="modal modal-lg" onClick={e => e.stopPropagation()} style={{ maxWidth: 860 }}>
             <div className="modal-header">
               <h3>Import from Spreadsheet</h3>
               <button className="modal-close" onClick={() => setShowImport(false)}>&times;</button>

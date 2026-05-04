@@ -14,7 +14,7 @@ const activityLogSchema = new mongoose.Schema({
       'task_assigned', 'task_unassigned', 'status_changed',
       'comment_added', 'comment_edited', 'comment_deleted',
       'attachment_uploaded', 'attachment_deleted',
-      'user_invited', 'user_removed', 'user_restored', 'role_changed',
+      'user_invited', 'user_removed', 'role_changed',
       'bulk_update', 'bulk_assign', 'bulk_status_change'
     ],
     required: true
