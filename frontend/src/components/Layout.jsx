@@ -164,14 +164,12 @@ export default function Layout() {
               </svg>
               <span className="sidebar-link-label">Notifications</span>
             </NavLink>
-            {user?.role === 'admin' && (
-              <NavLink to="/archived" className={navClass} title="Archived">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-                  <polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5" rx="1"/><line x1="10" y1="12" x2="14" y2="12"/>
-                </svg>
-                <span className="sidebar-link-label">Archived</span>
-              </NavLink>
-            )}
+            <NavLink to="/archived" className={navClass} title="Archived">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                <polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5" rx="1"/><line x1="10" y1="12" x2="14" y2="12"/>
+              </svg>
+              <span className="sidebar-link-label">Archived</span>
+            </NavLink>
             {user?.role === 'admin' && (
               <NavLink to="/logs" className={navClass} title="Logs">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">

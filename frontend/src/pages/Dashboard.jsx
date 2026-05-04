@@ -397,7 +397,7 @@ export default function Dashboard() {
               >
                 {board.color && <div className="board-card-color-bar" style={{ background: board.color }} />}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                  <h3>{board.title}</h3>
+                  <h3 style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{board.title}</h3>
                   <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
                     <button
                       className="board-card-menu"
@@ -463,7 +463,7 @@ export default function Dashboard() {
                     transition={{ delay: i * 0.05 }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                      <h3 style={{ opacity: 0.7 }}>{board.title}</h3>
+                      <h3 style={{ opacity: 0.7, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{board.title}</h3>
                       <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
                         {(user?.role === 'admin' || board.createdBy === user?._id) && (
                           <>
