@@ -116,6 +116,11 @@ const boardController = {
 
   async archive(req, res) {
     try {
+      const board = await Board.findById(req.params.boardId).select('organization createdBy archived');
+      if (!board) return res.status(404).json({ error: 'Board not found' });
+      const isAdmin = req.user.role === 'admin';
+      const isOwner = board.createdBy?.toString() === req.user._id.toString();
+      if (!isAdmin && !isOwner) return res.status(403).json({ error: 'Only the board creator or an admin can archive this project' });
       await Board.findByIdAndUpdate(req.params.boardId, { archived: true });
       res.json({ message: 'Board archived' });
     } catch (err) {
@@ -138,9 +143,13 @@ const boardController = {
 
   async restore(req, res) {
     try {
-      const board = await Board.findByIdAndUpdate(req.params.boardId, { archived: false }, { new: true });
+      const board = await Board.findById(req.params.boardId).select('createdBy');
       if (!board) return res.status(404).json({ error: 'Board not found' });
-      res.json(board);
+      const isAdmin = req.user.role === 'admin';
+      const isOwner = board.createdBy?.toString() === req.user._id.toString();
+      if (!isAdmin && !isOwner) return res.status(403).json({ error: 'Only the board creator or an admin can restore this project' });
+      const updated = await Board.findByIdAndUpdate(req.params.boardId, { archived: false }, { new: true });
+      res.json(updated);
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
@@ -148,9 +157,12 @@ const boardController = {
 
   async permanentDelete(req, res) {
     try {
-      const board = await Board.findById(req.params.boardId);
+      const board = await Board.findById(req.params.boardId).select('createdBy archived');
       if (!board) return res.status(404).json({ error: 'Board not found' });
       if (!board.archived) return res.status(400).json({ error: 'Board must be archived before permanent deletion' });
+      const isAdmin = req.user.role === 'admin';
+      const isOwner = board.createdBy?.toString() === req.user._id.toString();
+      if (!isAdmin && !isOwner) return res.status(403).json({ error: 'Only the board creator or an admin can delete this project' });
       const Task = require('../models/Task');
       await Task.deleteMany({ board: board._id });
       await Board.findByIdAndDelete(board._id);

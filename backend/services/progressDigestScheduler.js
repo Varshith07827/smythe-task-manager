@@ -8,9 +8,12 @@ const CRON_EXPRESSION = process.env.PROGRESS_DIGEST_CRON || '0 */4 * * *';
 async function runProgressDigestTick() {
   const Organization = require('../models/Organization');
 
-  // Orgs that have disabled progress digest
+  // Orgs that have disabled progress digest OR set mode to external
   const disabledOrgs = await Organization.find({
-    'settings.automations.progressDigest.enabled': false
+    $or: [
+      { 'settings.automations.progressDigest.enabled': false },
+      { 'settings.automations.progressDigest.cronMode': 'external' }
+    ]
   }).select('_id').lean();
   const disabledOrgIds = new Set(disabledOrgs.map(o => o._id.toString()));
 

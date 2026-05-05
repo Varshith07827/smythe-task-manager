@@ -14,8 +14,18 @@ const organizationSchema = new mongoose.Schema({
     allowUserComments: { type: Boolean, default: true },
     allowSignup: { type: Boolean, default: false },
     automations: {
-      deadlineReminder: { enabled: { type: Boolean, default: true } },
-      progressDigest:   { enabled: { type: Boolean, default: true } }
+      deadlineReminder: {
+        enabled:       { type: Boolean, default: true },
+        cronMode:      { type: String, enum: ['internal', 'external'], default: 'internal' },
+        webhookUrl:    { type: String, default: '' },
+        webhookSecret: { type: String, default: '' }
+      },
+      progressDigest: {
+        enabled:       { type: Boolean, default: true },
+        cronMode:      { type: String, enum: ['internal', 'external'], default: 'internal' },
+        webhookUrl:    { type: String, default: '' },
+        webhookSecret: { type: String, default: '' }
+      }
     }
   },
   branding: {

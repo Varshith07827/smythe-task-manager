@@ -100,6 +100,7 @@ const taskController = {
     try {
       const { boardId } = req.params;
       const { page = 1, limit = 50, sortBy, sortDir, ...filters } = req.query;
+      const safeLimit = Math.min(parseInt(limit) || 50, 200); // cap at 200
 
       const query = buildTaskQuery(filters, boardId);
       // Users only see tasks assigned to them
@@ -111,8 +112,8 @@ const taskController = {
       const [tasks, total] = await Promise.all([
         Task.find(query)
           .sort(sort)
-          .skip((parseInt(page) - 1) * parseInt(limit))
-          .limit(parseInt(limit))
+          .skip((parseInt(page) - 1) * safeLimit)
+          .limit(safeLimit)
           .populate('assignedTo', 'name avatar')
           .populate('assignedBy', 'name')
           .lean(),
@@ -123,7 +124,7 @@ const taskController = {
         tasks,
         total,
         page: parseInt(page),
-        pages: Math.ceil(total / parseInt(limit))
+        pages: Math.ceil(total / safeLimit)
       });
     } catch (err) {
       res.status(500).json({ error: err.message });

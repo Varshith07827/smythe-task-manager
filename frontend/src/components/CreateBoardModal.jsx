@@ -26,8 +26,8 @@ export default function CreateBoardModal({ onClose, onCreated }) {
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()}>
+    <div className="modal-overlay">
+      <div className="modal">
         <div className="modal-header">
           <h3>Create New Project</h3>
           <button className="modal-close" onClick={onClose}>&times;</button>

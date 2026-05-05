@@ -10,6 +10,16 @@ const otpStore = new Map();
 // In-memory pending registrations (production should use Redis or DB)
 const pendingRegistrations = new Map();
 
+/** Constant-time string comparison to prevent timing attacks */
+function safeEqual(a, b) {
+  try {
+    const ba = Buffer.from(String(a));
+    const bb = Buffer.from(String(b));
+    if (ba.length !== bb.length) return false;
+    return crypto.timingSafeEqual(ba, bb);
+  } catch { return false; }
+}
+
 const authController = {
   async requestOtp(req, res) {
     try {
@@ -45,7 +55,16 @@ const authController = {
       if (!email || !code) return res.status(400).json({ error: 'Email and code are required' });
 
       const entry = otpStore.get(email.toLowerCase());
-      if (!entry || entry.code !== code) return res.status(401).json({ error: 'Invalid code' });
+      if (!entry) return res.status(401).json({ error: 'Invalid code' });
+
+      // Increment attempt counter to prevent brute-force
+      entry.attempts = (entry.attempts || 0) + 1;
+      if (entry.attempts > 5) {
+        otpStore.delete(email.toLowerCase());
+        return res.status(429).json({ error: 'Too many attempts. Please request a new code.' });
+      }
+
+      if (!safeEqual(entry.code, code)) return res.status(401).json({ error: 'Invalid code' });
       if (Date.now() > entry.expires) {
         otpStore.delete(email.toLowerCase());
         return res.status(401).json({ error: 'Code expired' });
@@ -77,32 +96,29 @@ const authController = {
 
   async registerRequest(req, res) {
     try {
-      const { name, email, password, phone, organizationName } = req.body;
-      if (!name?.trim() || !email || !password) {
-        return res.status(400).json({ error: 'Name, email, and password are required' });
-      }
-      if (password.length < 6) {
-        return res.status(400).json({ error: 'Password must be at least 6 characters' });
+      const { name, email, phone } = req.body;
+      if (!name?.trim() || !email) {
+        return res.status(400).json({ error: 'Name and email are required' });
       }
 
       const existing = await User.findOne({ email });
-      if (existing) return res.status(400).json({ error: 'Email already registered' });
+      if (existing && existing.status !== 'inactive') return res.status(400).json({ error: 'An account with this email already exists.' });
 
       const code = String(Math.floor(100000 + Math.random() * 900000));
       pendingRegistrations.set(email.toLowerCase(), {
         name: name.trim(),
         email: email.toLowerCase(),
-        password,
         phone: phone?.trim() || '',
-        organizationName: organizationName?.trim() || '',
         code,
         expires: Date.now() + 15 * 60 * 1000
       });
 
+      const branding = await emailService.getAppBranding();
       const htmlBody = emailService.buildNotificationEmail(
         'Confirm your registration',
         `Hi ${name.trim()},\n\nYour confirmation code is:\n\n${code}\n\nThis code expires in 15 minutes.\n\nIf you did not request this, please ignore this email.`,
-        'task_assigned'
+        'task_assigned',
+        branding
       );
 
       await emailService.send(email, 'Confirm your account', htmlBody);
@@ -124,96 +140,96 @@ const authController = {
         pendingRegistrations.delete(email.toLowerCase());
         return res.status(400).json({ error: 'Confirmation code has expired. Please register again.' });
       }
-      if (pending.code !== code.trim()) return res.status(400).json({ error: 'Invalid confirmation code' });
+      if (!safeEqual(pending.code, code.trim())) return res.status(400).json({ error: 'Invalid confirmation code' });
 
       // Check again in case someone else registered with same email during confirmation
       const existing = await User.findOne({ email: pending.email });
-      if (existing) return res.status(400).json({ error: 'Email already registered' });
+      if (existing && existing.status !== 'inactive') return res.status(400).json({ error: 'An account with this email already exists.' });
 
-      // Create user and organization
-      const user = new User({
-        name: pending.name,
-        email: pending.email,
-        password: pending.password,
-        phone: pending.phone || undefined,
-        role: 'admin',
-        status: 'active'
+      // Find the default organization (first org in DB, or the one admins belong to)
+      let org = await Organization.findOne().sort({ createdAt: 1 });
+
+      if (!org) {
+        // Need a creator — use any active admin, or a system placeholder
+        const anyAdmin = await User.findOne({ role: 'admin', status: 'active' }).select('_id').lean();
+        const creatorId = anyAdmin?._id || new (require('mongoose').Types.ObjectId)();
+        org = await Organization.create({
+          name: 'Default Organization',
+          creator: creatorId,
+          members: [],
+          inviteCode: crypto.randomBytes(8).toString('hex')
+        });
+      }
+
+      // Generate a readable temp password (same as invite flow)
+      const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+      let tempPassword = '';
+      for (let i = 0; i < 12; i++) tempPassword += chars[Math.floor(Math.random() * chars.length)];
+
+      let user;
+      if (existing && existing.status === 'inactive') {
+        user = existing;
+        user.name = pending.name;
+        if (pending.phone) user.phone = pending.phone;
+        user.status = 'active';
+        user.password = tempPassword;
+        user.organization = org._id;
+        await user.save();
+      } else {
+        // Create user as a regular 'user' role with temp password
+        user = new User({
+          name: pending.name,
+          email: pending.email,
+          password: tempPassword,
+          phone: pending.phone || undefined,
+          role: 'user',
+          status: 'active',
+          organization: org._id
+        });
+        await user.save();
+      }
+
+      // Ensure no duplicates then Add user to org members
+      await Organization.findByIdAndUpdate(org._id, {
+        $pull: { members: { user: user._id } }
       });
-      await user.save();
-
-      const org = await Organization.create({
-        name: pending.organizationName || `${pending.name}'s Organization`,
-        creator: user._id,
-        members: [{ user: user._id, role: 'admin' }],
-        inviteCode: crypto.randomBytes(8).toString('hex')
+      await Organization.findByIdAndUpdate(org._id, {
+        $push: { members: { user: user._id, role: 'user' } }
       });
-
-      user.organization = org._id;
-      await user.save({ validateBeforeSave: false });
 
       pendingRegistrations.delete(email.toLowerCase());
 
-      const token = generateToken(user._id);
-
-      // Send welcome email to new user
-      const appName = 'Smythe';
-      const welcomeHtml = `<!DOCTYPE html>
-<html>
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;background:#f5f5f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f7;padding:40px 20px">
-    <tr><td align="center">
-      <table width="540" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08)">
-        <tr><td style="background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);padding:40px;text-align:center">
-          <div style="width:52px;height:52px;background:#0a84ff;border-radius:14px;display:inline-flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;color:#fff;margin-bottom:16px">${appName[0]}</div>
-          <h1 style="color:#ffffff;font-size:26px;font-weight:700;margin:0;letter-spacing:-0.5px">Welcome to ${appName}!</h1>
-          <p style="color:rgba(255,255,255,0.6);margin:8px 0 0;font-size:15px">Your account is ready</p>
-        </td></tr>
-        <tr><td style="padding:36px 40px">
-          <p style="color:#1d1d1f;font-size:16px;margin:0 0 12px">Hi <strong>${pending.name}</strong>,</p>
-          <p style="color:#6e6e73;font-size:15px;line-height:1.6;margin:0 0 24px">
-            Your account has been created successfully. You are the admin of your new organization
-            <strong style="color:#1d1d1f">${org.name}</strong>.
-          </p>
-          <div style="background:#f5f5f7;border-radius:12px;padding:20px;margin-bottom:24px">
-            <p style="margin:0 0 8px;font-size:13px;font-weight:600;color:#6e6e73;text-transform:uppercase;letter-spacing:0.5px">Your account</p>
-            <p style="margin:0 0 4px;font-size:14px;color:#1d1d1f"><strong>Name:</strong> ${pending.name}</p>
-            <p style="margin:0 0 4px;font-size:14px;color:#1d1d1f"><strong>Email:</strong> ${pending.email}</p>
-            ${pending.phone ? `<p style="margin:0;font-size:14px;color:#1d1d1f"><strong>Phone:</strong> ${pending.phone}</p>` : ''}
-          </div>
-          <p style="color:#6e6e73;font-size:14px;line-height:1.6;margin:0 0 24px">
-            Get started by creating your first project board and inviting your team members.
-          </p>
-          <p style="color:#6e6e73;font-size:13px;margin:24px 0 0;padding-top:20px;border-top:1px solid #e5e5ea">
-            If you didn't create this account, please contact support immediately.
-          </p>
-        </td></tr>
-      </table>
-    </td></tr>
-  </table>
-</body>
-</html>`;
+      // Send welcome email with credentials (like invite flow)
+      const branding = await emailService.getAppBranding(org._id);
+      const appName = branding.appTitle || 'Smythe';
+      const welcomeHtml = emailService.buildNotificationEmail(
+        `Welcome to ${appName}!`,
+        `Dear ${pending.name},\n\nThank you for joining ${appName}, we appreciate your interest to be part of our community.\n\nPlease use the following details to login, please change your password.\n\nEmail: ${pending.email}\nPassword: ${tempPassword}\n\nThank you`,
+        'task_assigned',
+        branding
+      );
 
       emailService.send(pending.email, `Welcome to ${appName}!`, welcomeHtml).catch(() => {});
 
-      // Notify all existing admins across the platform about the new signup
-      const allAdmins = await User.find({ role: 'admin', status: 'active', _id: { $ne: user._id } })
+      // Notify all admin(s) in the DB about the new signup
+      const allAdmins = await User.find({ role: 'admin', status: 'active' })
         .select('email name').lean();
 
       if (allAdmins.length) {
         const adminNotifyHtml = emailService.buildNotificationEmail(
-          'New User Registered',
-          `A new account has been created on ${appName}.\n\nName: ${pending.name}\nEmail: ${pending.email}${pending.phone ? `\nPhone: ${pending.phone}` : ''}\nOrganization: ${org.name}\nRegistered: ${new Date().toLocaleString()}`,
-          'task_assigned'
+          'New User Signed Up',
+          `A new user has signed up on ${appName}.\n\nName: ${pending.name}\nEmail: ${pending.email}${pending.phone ? `\nPhone: ${pending.phone}` : ''}\nRegistered: ${new Date().toLocaleString()}`,
+          'task_assigned',
+          branding
         );
         for (const admin of allAdmins) {
-          emailService.send(admin.email, `${appName} - New User Registered: ${pending.name}`, adminNotifyHtml).catch(() => {});
+          emailService.send(admin.email, `${appName} - New User Signed Up: ${pending.name}`, adminNotifyHtml).catch(() => {});
         }
       }
 
+      // Don't auto-login — user will login with emailed credentials
       res.status(201).json({
-        token,
-        user: { _id: user._id, name: user.name, email: user.email, role: user.role, organization: org._id }
+        message: 'Account created! Check your email for login credentials.'
       });
     } catch (err) {
       res.status(500).json({ error: err.message });
@@ -361,7 +377,7 @@ const authController = {
       res.status(201).json({
         message: 'User invited',
         user: { _id: user._id, name: user.name, email: user.email, role: user.role },
-        tempPassword // Shown to inviting admin in Settings UI as a fallback if email fails
+        tempPassword
       });
     } catch (err) {
       res.status(500).json({ error: err.message });

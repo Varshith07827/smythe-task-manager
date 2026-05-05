@@ -384,7 +384,7 @@ export default function Dashboard() {
                         <line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 00-1.11-1.79l-1.78-.9A2 2 0 0115 10.76V6h1a2 2 0 000-4H8a2 2 0 000 4h1v4.76a2 2 0 01-1.11 1.79l-1.78.9A2 2 0 005 15.24z"/>
                       </svg>
                     </button>
-                    {user?.role === 'admin' && (
+                    {(user?.role === 'admin' || board.createdBy === user?._id) && (
                       <button
                         className="board-card-menu"
                         onClick={(e) => handleArchiveBoard(e, board._id, board.title)}

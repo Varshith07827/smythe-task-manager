@@ -25,10 +25,8 @@ export function AuthProvider({ children }) {
           setUser(res.data);
           localStorage.setItem('user', JSON.stringify(res.data));
         })
-        .catch((err) => {
-          if (err.response?.status === 401) {
-            logout();
-          }
+        .catch(() => {
+          logout();
         })
         .finally(() => setLoading(false));
     } else {

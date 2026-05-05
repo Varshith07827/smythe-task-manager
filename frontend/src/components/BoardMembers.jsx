@@ -69,8 +69,8 @@ export default function BoardMembers({ board, boardId, myRole, onClose, onBoardU
   const initials = (name) => name?.split(' ').map(n => n[0]).join('').toUpperCase() || '?';
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 560 }}>
+    <div className="modal-overlay">
+      <div className="modal" style={{ maxWidth: 560 }}>
         <div className="modal-header">
           <h3>Project Users</h3>
           <button className="modal-close" onClick={onClose}>&times;</button>

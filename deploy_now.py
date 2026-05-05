@@ -1,15 +1,33 @@
-"""Full redeploy: upload backend + frontend dist, install deps, restart PM2"""
+"""Full redeploy: upload backend + frontend dist, install deps, restart PM2
+
+Credentials are read from environment variables to avoid hardcoding secrets.
+Set the following before running:
+    DEPLOY_HOST        - server IP/hostname  (default: 45.90.223.131)
+    DEPLOY_USER        - SSH username        (default: novusdev)
+    DEPLOY_PASS        - SSH password        (required)
+    DEPLOY_JWT_SECRET  - JWT secret for .env (required)
+    DEPLOY_NOTEIFY_KEY - Noteify API key     (required)
+"""
 import paramiko
 import os
 import sys
 import subprocess
 import shutil
 
-HOST = '45.90.223.131'
-USER = 'novusdev'
-PASS = 'March@2026'
-APP_DIR = '/var/www/dev.anydb.pro'
+HOST     = os.environ.get('DEPLOY_HOST', '45.90.223.131')
+USER     = os.environ.get('DEPLOY_USER', 'novusdev')
+PASS     = os.environ.get('DEPLOY_PASS', '')
+JWT_SECRET   = os.environ.get('DEPLOY_JWT_SECRET', '')
+NOTEIFY_KEY  = os.environ.get('DEPLOY_NOTEIFY_KEY', '')
+APP_DIR  = '/var/www/dev.anydb.pro'
 LOCAL_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# --- Validate required secrets ---
+missing = [k for k, v in [('DEPLOY_PASS', PASS), ('DEPLOY_JWT_SECRET', JWT_SECRET), ('DEPLOY_NOTEIFY_KEY', NOTEIFY_KEY)] if not v]
+if missing:
+    print(f"ERROR: Required environment variable(s) not set: {', '.join(missing)}")
+    print("Set them before running:  $env:DEPLOY_PASS='...'  (PowerShell)")
+    sys.exit(1)
 
 def run_local(cmd, cwd):
     print(f"\n>>> [local] {' '.join(cmd)}")
@@ -42,7 +60,23 @@ def run(ssh, cmd, timeout=180):
     return out, err, code
 
 def sudo(ssh, cmd, timeout=120):
-    return run(ssh, f"echo '{PASS}' | sudo -S bash -c '{cmd}'", timeout)
+    """Run a sudo command safely — password sent via stdin, not shell args."""
+    full_cmd = f"sudo -S bash -c '{cmd}'"
+    print(f"\n>>> [sudo] {cmd[:200]}")
+    stdin, stdout, stderr = ssh.exec_command(full_cmd, timeout=timeout)
+    stdin.write(PASS + '\n')
+    stdin.flush()
+    stdin.channel.shutdown_write()
+    out = stdout.read().decode('utf-8', errors='replace')
+    err = stderr.read().decode('utf-8', errors='replace')
+    code = stdout.channel.recv_exit_status()
+    combined = out + err
+    if combined.strip():
+        text = combined[-3000:] if len(combined) > 3000 else combined
+        sys.stdout.buffer.write(text.encode('utf-8', errors='replace'))
+        sys.stdout.buffer.write(b'\n')
+        sys.stdout.buffer.flush()
+    return out, err, code
 
 def upload_dir(sftp, local_path, remote_path, exclude=None):
     """Recursively upload a directory"""
@@ -70,7 +104,18 @@ print("  SMYTHE DEPLOYMENT TO dev.anydb.pro")
 print("=" * 50)
 
 ssh = paramiko.SSHClient()
-ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+# Load known hosts for host key verification
+known_hosts_path = os.path.expanduser('~/.ssh/known_hosts')
+if os.path.exists(known_hosts_path):
+    ssh.load_host_keys(known_hosts_path)
+    ssh.set_missing_host_key_policy(paramiko.RejectPolicy())
+    print(f"Using known_hosts: {known_hosts_path}")
+else:
+    # First-time deploy: warn and accept, then save
+    print("WARNING: ~/.ssh/known_hosts not found. Accepting host key for first-time deploy.")
+    print("         After this run, add the server fingerprint to known_hosts for future security.")
+    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
 print("\nConnecting to server...")
 ssh.connect(HOST, username=USER, password=PASS)
 sftp = ssh.open_sftp()
@@ -113,9 +158,9 @@ else:
     print("  ERROR: frontend/dist not found! Run 'npm run build' in frontend first.")
     sys.exit(1)
 
-# --- 3. Write production .env ---
+# --- 3. Write production .env from env vars ---
 print("\n=== 3/7 Write Production .env ===")
-env_content = """# Server
+env_content = f"""# Server
 PORT=5000
 NODE_ENV=production
 CLIENT_URL=https://dev.anydb.pro
@@ -124,11 +169,11 @@ CLIENT_URL=https://dev.anydb.pro
 MONGO_URI=mongodb://localhost:27017/smythe
 
 # Auth
-JWT_SECRET=Technoblade-never-dies
+JWT_SECRET={JWT_SECRET}
 JWT_EXPIRES_IN=7d
 
 # Email Notifications (Noteify)
-NOTEIFY_API_KEY=58xyr3rts783*&$8xyr$8xyr3r3rts783$8xyr3r
+NOTEIFY_API_KEY={NOTEIFY_KEY}
 """
 with sftp.open(f"{APP_DIR}/backend/.env", 'w') as f:
     f.write(env_content)

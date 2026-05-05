@@ -35,13 +35,16 @@ async function runDeadlineCheck() {
   const Board = require('../models/Board');
   const Organization = require('../models/Organization');
 
-  // Orgs that have disabled deadline reminders
+  // Orgs that have disabled deadline reminders OR set mode to external (handled by external cron)
   const disabledOrgs = await Organization.find({
-    'settings.automations.deadlineReminder.enabled': false
+    $or: [
+      { 'settings.automations.deadlineReminder.enabled': false },
+      { 'settings.automations.deadlineReminder.cronMode': 'external' }
+    ]
   }).select('_id').lean();
   const disabledOrgIds = disabledOrgs.map(o => o._id);
 
-  // Boards to exclude: archived OR belonging to a disabled org
+  // Boards to exclude: archived OR belonging to a disabled/external-mode org
   const excludedBoards = await Board.find({
     $or: [
       { archived: true },

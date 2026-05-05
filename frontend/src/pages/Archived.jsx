@@ -67,7 +67,7 @@ export default function Archived() {
               transition={{ delay: i * 0.05 }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                <h3 style={{ opacity: 0.7, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{board.title}</h3>
+                <h3 style={{ opacity: 0.7 }}>{board.title}</h3>
                 <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
                   <button
                     className="btn btn-ghost btn-xs"

@@ -11,10 +11,10 @@ router.post('/', authenticate, boardController.create);
 router.get('/', authenticate, boardController.getAll);
 router.get('/archived', authenticate, authorize('admin'), boardController.getArchived);
 router.get('/:boardId', authenticate, checkBoardAccess('view'), boardController.getOne);
-router.patch('/:boardId', authenticate, authorize('admin'), checkBoardAccess('edit'), boardController.update);
-router.patch('/:boardId/restore', authenticate, authorize('admin'), boardController.restore);
-router.delete('/:boardId', authenticate, authorize('admin'), boardController.archive);
-router.delete('/:boardId/permanent', authenticate, authorize('admin'), boardController.permanentDelete);
+router.patch('/:boardId', authenticate, checkBoardAccess('edit'), boardController.update);
+router.patch('/:boardId/restore', authenticate, checkBoardAccess('edit'), boardController.restore);
+router.delete('/:boardId', authenticate, checkBoardAccess('edit'), boardController.archive);
+router.delete('/:boardId/permanent', authenticate, checkBoardAccess('edit'), boardController.permanentDelete);
 
 // Columns
 router.post('/:boardId/columns', authenticate, authorize('admin'), checkBoardAccess('edit'), boardController.addColumn);
@@ -40,8 +40,8 @@ router.post('/:boardId/tasks', authenticate, checkBoardAccess('edit'), validateC
 router.get('/:boardId/tasks', authenticate, checkBoardAccess('view'), taskController.getAll);
 router.get('/:boardId/tasks/:taskId', authenticate, checkBoardAccess('view'), taskController.getOne);
 router.patch('/:boardId/tasks/:taskId', authenticate, checkBoardAccess('edit'), taskController.update);
-router.delete('/:boardId/tasks/:taskId', authenticate, authorize('admin'), taskController.archive);
-router.delete('/:boardId/tasks/:taskId/permanent', authenticate, authorize('admin'), taskController.permanentDelete);
+router.delete('/:boardId/tasks/:taskId', authenticate, checkBoardAccess('edit'), taskController.archive);
+router.delete('/:boardId/tasks/:taskId/permanent', authenticate, checkBoardAccess('edit'), taskController.permanentDelete);
 router.post('/:boardId/tasks/:taskId/remind', authenticate, authorize('admin'), taskController.remind);
 router.patch('/:boardId/tasks/:taskId/notifications', authenticate, authorize('admin'), checkBoardAccess('edit'), taskController.updateNotifications);
 

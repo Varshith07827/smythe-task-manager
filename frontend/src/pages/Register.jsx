@@ -1,10 +1,9 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
 import { useBranding } from '../context/BrandingContext';
 import { authApi } from '../api/auth';
 import { alert } from '../components/AlertSystem';
-import PasswordInput from '../components/PasswordInput';
+import AuthLayout from '../components/AuthLayout';
 import { motion } from 'framer-motion';
 
 export default function Register() {
@@ -12,12 +11,41 @@ export default function Register() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [password, setPassword] = useState('');
-  const [orgName, setOrgName] = useState('');
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const { register } = useAuth();
+  // Support modal state
+  const [showSupport, setShowSupport] = useState(false);
+  const [supportEmail, setSupportEmail] = useState('');
+  const [supportSubject, setSupportSubject] = useState('');
+  const [supportDetails, setSupportDetails] = useState('');
+  const [supportLoading, setSupportLoading] = useState(false);
+
+  const openSupport = () => {
+    setSupportEmail(email);
+    setSupportSubject('');
+    setSupportDetails('');
+    setShowSupport(true);
+  };
+
+  const handleSupportSubmit = async (e) => {
+    e.preventDefault();
+    setSupportLoading(true);
+    try {
+      await authApi.submitSupport({
+        email: supportEmail,
+        subject: supportSubject.trim(),
+        details: supportDetails.trim()
+      });
+      alert.success('Support request sent to administrators');
+      setShowSupport(false);
+    } catch (err) {
+      alert.error(err.response?.data?.error || 'Failed to send support request');
+    } finally {
+      setSupportLoading(false);
+    }
+  };
+
   const branding = useBranding();
   const navigate = useNavigate();
   const appName = branding.appTitle || 'Smythe';
@@ -26,7 +54,7 @@ export default function Register() {
     e.preventDefault();
     setLoading(true);
     try {
-      await authApi.registerRequest({ name, email, phone, password, organizationName: orgName });
+      await authApi.registerRequest({ name, email, phone });
       alert.success('Confirmation code sent to your email');
       setStep('confirm');
     } catch (err) {
@@ -45,9 +73,9 @@ export default function Register() {
     e.preventDefault();
     setLoading(true);
     try {
-      await register({ email, code });
-      alert.success('Account created! Welcome aboard.');
-      navigate('/');
+      await authApi.registerConfirm({ email, code });
+      alert.success('Account created! Check your email for login credentials.');
+      navigate('/login');
     } catch (err) {
       const msg = err.response?.data?.error;
       alert.error(msg || 'Invalid or expired code. Please try again.');
@@ -56,40 +84,73 @@ export default function Register() {
     }
   };
 
-  return (
-    <div className="login-layout">
-      {/* Sidebar */}
-      <aside className="login-sidebar" style={branding.sidebarColor ? { background: branding.sidebarColor } : undefined}>
-        <div className="login-sidebar-brand">
-          {branding.logoUrl ? (
-            <img src={branding.logoUrl} alt={appName} style={{
-              height: 36, width: 36, objectFit: 'cover',
-              borderRadius: branding.logoShape === 'circle' ? '50%' : branding.logoShape === 'square' ? 4 : 8
-            }} />
-          ) : (
-            <div className="login-sidebar-icon">{appName[0]}</div>
-          )}
-          <span className="login-sidebar-title">{appName}</span>
+  const navLinks = [
+    {
+      onClick: openSupport,
+      label: 'Support',
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3" /><line x1="12" y1="17" x2="12.01" y2="17" />
+        </svg>
+      )
+    },
+    {
+      to: '/login',
+      label: 'Login',
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4" /><polyline points="10 17 15 12 10 7" /><line x1="15" y1="12" x2="3" y2="12" />
+        </svg>
+      )
+    }
+  ];
+
+  const supportModal = showSupport && (
+    <div className="modal-overlay">
+      <motion.div
+        className="modal"
+        onClick={e => e.stopPropagation()}
+        initial={{ opacity: 0, scale: 0.95, y: 10 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ type: 'spring', damping: 28, stiffness: 400 }}
+        style={{ maxWidth: 480 }}
+      >
+        <div className="modal-header">
+          <h3>Support</h3>
+          <button className="modal-close" onClick={() => setShowSupport(false)}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
+          </button>
         </div>
+        <form className="modal-body" style={{ padding: '16px 24px 24px' }} onSubmit={handleSupportSubmit}>
+          <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 16, lineHeight: 1.5 }}>
+            Describe your issue and an administrator will be notified via email.
+          </p>
+          <div className="form-group">
+            <label className="form-label">Your Email</label>
+            <input type="email" className="form-input" placeholder="you@example.com" value={supportEmail} onChange={e => setSupportEmail(e.target.value)} required autoFocus />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Subject</label>
+            <input type="text" className="form-input" placeholder="Brief description of the issue" value={supportSubject} onChange={e => setSupportSubject(e.target.value)} required />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Details</label>
+            <textarea className="form-input" placeholder="Describe your issue in detail..." value={supportDetails} onChange={e => setSupportDetails(e.target.value)} rows={4} required />
+          </div>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => setShowSupport(false)}>Cancel</button>
+            <button type="submit" className="btn btn-primary btn-sm" disabled={!supportEmail || !supportSubject.trim() || !supportDetails.trim() || supportLoading}>
+              {supportLoading ? 'Sending...' : 'Send to Admins'}
+            </button>
+          </div>
+        </form>
+      </motion.div>
+    </div>
+  );
 
-        <nav className="login-sidebar-nav">
-          <Link to="/login" className="login-sidebar-link">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/>
-            </svg>
-            <span>Login</span>
-          </Link>
-        </nav>
-
-        <div className="login-sidebar-footer">
-          <span>v1.0</span>
-        </div>
-      </aside>
-
-      {/* Main area */}
-      <main className="login-main">
-        <header className="login-header" />
-
+  if (!branding.allowSignup) {
+    return (
+      <AuthLayout navLinks={navLinks} onSupport={openSupport}>
         <div className="login-center">
           <motion.div
             className="auth-card"
@@ -97,20 +158,39 @@ export default function Register() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
           >
-            {!branding.allowSignup ? (
-              <div style={{ textAlign: 'center', padding: '20px 0' }}>
-                <h2 style={{ marginBottom: 12 }}>Registration Disabled</h2>
-                <p style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: 24 }}>
-                  Public sign-up is currently disabled for this organization. Please contact an administrator to be invited.
-                </p>
-                <Link to="/login" className="btn btn-primary" style={{ display: 'inline-block', width: '100%' }}>Back to Login</Link>
+            <div style={{ textAlign: 'center', padding: '12px 4px' }}>
+              <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'var(--accent-subtle)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0110 0v4" />
+                </svg>
               </div>
-            ) : step === 'form' ? (
+              <h2 style={{ marginBottom: 8 }}>Registration Closed</h2>
+              <p style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: 20 }}>
+                Sorry, public sign-ups are not allowed at the moment. Please contact your administrator for an invitation, or sign in if you already have an account.
+              </p>
+              <Link to="/login" className="btn btn-primary" style={{ display: 'inline-block', textDecoration: 'none' }}>
+                Go to Login
+              </Link>
+            </div>
+          </motion.div>
+        </div>
+        {supportModal}
+      </AuthLayout>
+    );
+  }
+
+  return (
+    <AuthLayout navLinks={navLinks} onSupport={openSupport}>
+      <div className="login-center">
+        <motion.div
+          className="auth-card"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
+        >
+            {step === 'form' ? (
               <>
-                <h2 style={{ textAlign: 'center', marginBottom: 6 }}>Create Account</h2>
-                <p style={{ textAlign: 'center', fontSize: 13, color: 'var(--text-tertiary)', marginBottom: 20 }}>
-                  We'll send a confirmation code to your email.
-                </p>
+                <h2 style={{ textAlign: 'center', marginBottom: 6 }}>Sign Up</h2>
 
                 <form onSubmit={handleRequestCode}>
                   <div className="form-group">
@@ -124,14 +204,6 @@ export default function Register() {
                   <div className="form-group">
                     <label className="form-label">Phone <span style={{ color: 'var(--text-tertiary)', fontWeight: 400 }}>(optional)</span></label>
                     <input type="tel" className="form-input" placeholder="+1 555 000 0000" value={phone} onChange={e => setPhone(e.target.value)} />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Password</label>
-                    <PasswordInput placeholder="Min. 6 characters" value={password} onChange={e => setPassword(e.target.value)} required minLength={6} />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Organization Name <span style={{ color: 'var(--text-tertiary)', fontWeight: 400 }}>(optional)</span></label>
-                    <input type="text" className="form-input" placeholder="Your Company" value={orgName} onChange={e => setOrgName(e.target.value)} />
                   </div>
                   <button type="submit" className="btn btn-primary" disabled={loading}>
                     {loading ? 'Sending code...' : 'Continue'}
@@ -182,7 +254,7 @@ export default function Register() {
                     onClick={async () => {
                       setLoading(true);
                       try {
-                        await authApi.registerRequest({ name, email, phone, password, organizationName: orgName });
+                        await authApi.registerRequest({ name, email, phone });
                         alert.success('New code sent');
                       } catch { alert.error('Could not resend code'); }
                       finally { setLoading(false); }
@@ -198,9 +270,9 @@ export default function Register() {
             <div className="auth-footer">
               Already have an account? <Link to="/login">Sign in</Link>
             </div>
-          </motion.div>
-        </div>
-      </main>
-    </div>
+        </motion.div>
+      </div>
+      {supportModal}
+    </AuthLayout>
   );
 }

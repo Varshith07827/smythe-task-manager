@@ -79,9 +79,7 @@ export default function BoardView() {
     document.addEventListener('mouseup', onUp);
   };
 
-  const isManager = user?.role === 'admin' || 
-    (board?.createdBy?._id === user?._id) || 
-    (board?.permissions?.allowedManagers?.includes(user?._id));
+  const isManager = user?.role === 'admin';
 
   const loadBoard = useCallback(async () => {
     try {
@@ -255,22 +253,24 @@ export default function BoardView() {
             aria-label="Search tasks"
             style={{ maxWidth: 200 }}
           />
-          <select className="toolbar-select" value={statusFilter} onChange={e => setStatusFilter(e.target.value)} aria-label="Filter by status">
-            <option value="">All statuses</option>
-            {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
-          </select>
-          <select className="toolbar-select" value={priorityFilter} onChange={e => setPriorityFilter(e.target.value)} aria-label="Filter by priority">
-            <option value="">All priorities</option>
-            {PRIORITY_OPTIONS.map(p => <option key={p} value={p}>{p}</option>)}
-          </select>
+          <div className="toolbar-filters">
+            <select className="toolbar-select" value={statusFilter} onChange={e => setStatusFilter(e.target.value)} aria-label="Filter by status">
+              <option value="">All statuses</option>
+              {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
+            </select>
+            <select className="toolbar-select" value={priorityFilter} onChange={e => setPriorityFilter(e.target.value)} aria-label="Filter by priority">
+              <option value="">All priorities</option>
+              {PRIORITY_OPTIONS.map(p => <option key={p} value={p}>{p}</option>)}
+            </select>
+          </div>
           <span className="toolbar-count">{total} task{total !== 1 ? 's' : ''}</span>
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
             <div className="view-toggle">
               <button type="button" className={`view-toggle-btn${viewMode === 'table' ? ' active' : ''}`} onClick={() => setViewMode('table')} title="Table view">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18M3 15h18M9 3v18" /></svg>
               </button>
               <button type="button" className={`view-toggle-btn${viewMode === 'list' ? ' active' : ''}`} onClick={() => setViewMode('list')} title="List view">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" /></svg>
               </button>
             </div>
             {isManager && (
@@ -279,23 +279,23 @@ export default function BoardView() {
                 align="end"
                 buttonContent={
                   <>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /><circle cx="5" cy="12" r="1" /></svg>
                   </>
                 }
               >
                 {(close) => (
                   <>
                     <button type="button" className="dropdown-item" onClick={() => { setShowImport(true); close(); }}>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
                       Import
                     </button>
                     <button type="button" className="dropdown-item" onClick={() => { setShowColumnManager(true); close(); }}>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M15 3v18"/></svg>
-                      Manage columns
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M9 3v18M15 3v18" /></svg>
+                      Manage Form Fields
                     </button>
                     <div className="dropdown-divider" />
                     <button type="button" className="dropdown-item" onClick={() => { setShowSendReport(true); close(); }}>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22,6 12,13 2,6" /></svg>
                       Send report via email
                     </button>
                   </>
@@ -303,8 +303,8 @@ export default function BoardView() {
               </Dropdown>
             )}
             <button type="button" className="btn btn-primary btn-sm" onClick={() => setShowCreateTask(true)}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
-              New task
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
+              New
             </button>
           </div>
         </div>
@@ -323,7 +323,7 @@ export default function BoardView() {
             <Dropdown
               buttonClassName="btn btn-sm btn-secondary"
               align="end"
-              buttonContent={<>Set status <svg className="dropdown-chevron" width="10" height="10" viewBox="0 0 10 6" fill="none"><path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg></>}
+              buttonContent={<>Set status <svg className="dropdown-chevron" width="10" height="10" viewBox="0 0 10 6" fill="none"><path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg></>}
             >
               {(close) => STATUS_OPTIONS.map(s => (
                 <button key={s} type="button" className="dropdown-item" onClick={() => { handleBulkStatus(s); close(); }}>
@@ -343,16 +343,16 @@ export default function BoardView() {
         <div className="empty-state">
           <div className="empty-state-icon">
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" strokeWidth="1.5" strokeLinecap="round">
-              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
-              <polyline points="14 2 14 8 20 8"/>
-              <line x1="12" y1="18" x2="12" y2="12"/>
-              <line x1="9" y1="15" x2="15" y2="15"/>
+              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+              <polyline points="14 2 14 8 20 8" />
+              <line x1="12" y1="18" x2="12" y2="12" />
+              <line x1="9" y1="15" x2="15" y2="15" />
             </svg>
           </div>
-          <h3>No tasks yet</h3>
-          <p>Create your first task or import from a spreadsheet</p>
+          <h3>No items yet</h3>
+          <p>Create your first item or import from a spreadsheet</p>
           <div className="empty-state-actions">
-            <button type="button" className="btn btn-primary" onClick={() => setShowCreateTask(true)}>New task</button>
+            <button type="button" className="btn btn-primary" onClick={() => setShowCreateTask(true)}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg> New</button>
             <button type="button" className="btn btn-secondary" onClick={() => setShowImport(true)}>Import</button>
           </div>
         </div>
@@ -365,7 +365,7 @@ export default function BoardView() {
                 <th style={{ width: 36 }}>
                   <div className={`checkbox ${selectedTasks.size === tasks.length ? 'checked' : ''}`} onClick={toggleSelectAll}>
                     {selectedTasks.size === tasks.length && (
-                      <svg width="11" height="9" viewBox="0 0 11 9" fill="none"><path d="M1 4.5L4 7.5L10 1.5" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      <svg width="11" height="9" viewBox="0 0 11 9" fill="none"><path d="M1 4.5L4 7.5L10 1.5" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
                     )}
                   </div>
                 </th>
@@ -422,7 +422,7 @@ export default function BoardView() {
                 <div className="task-list-card-body">
                   <div className="task-list-card-top">
                     <div className={`checkbox ${selectedTasks.has(task._id) ? 'checked' : ''}`} onClick={e => { e.stopPropagation(); toggleTaskSelection(task._id); }}>
-                      {selectedTasks.has(task._id) && <svg width="11" height="9" viewBox="0 0 11 9" fill="none"><path d="M1 4.5L4 7.5L10 1.5" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                      {selectedTasks.has(task._id) && <svg width="11" height="9" viewBox="0 0 11 9" fill="none"><path d="M1 4.5L4 7.5L10 1.5" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>}
                     </div>
                     <span className="task-list-card-title">{task.title}</span>
                     <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginLeft: 'auto', flexShrink: 0 }}>
@@ -450,7 +450,7 @@ export default function BoardView() {
                     )}
                     {task.comments?.length > 0 && (
                       <span className="task-list-card-meta">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" /></svg>
                         {task.comments.length}
                       </span>
                     )}
@@ -471,7 +471,6 @@ export default function BoardView() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={() => setSelectedTask(null)}
             />
             <TaskDetail
               task={selectedTask}
@@ -532,7 +531,7 @@ export default function BoardView() {
             <div className="modal-header">
               <h3>Send Progress Report</h3>
               <button className="modal-close" onClick={() => setShowSendReport(false)}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
               </button>
             </div>
             <div className="modal-body" style={{ padding: '16px 24px 24px' }}>
@@ -603,7 +602,7 @@ export default function BoardView() {
             <div className="modal-header">
               <h3>Delete Tasks</h3>
               <button className="modal-close" onClick={() => setConfirmBulkDelete(false)}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
               </button>
             </div>
             <div className="modal-body" style={{ padding: '16px 24px 24px' }}>

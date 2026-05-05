@@ -11,29 +11,37 @@ const checkBoardAccess = (requiredLevel = 'view') => {
 
       const userId = req.user._id.toString();
       const role = req.user.role;
+      const userOrgId = req.user.organization?.toString();
+      const boardOrgId = board.organization?.toString();
 
-      // Admin has full access
+      // Org boundary check: users must belong to the same org as the board
+      if (userOrgId && boardOrgId && userOrgId !== boardOrgId) {
+        return res.status(403).json({ error: 'No access to this board' });
+      }
+
+      // Admin has full access within their org
       if (role === 'admin') {
         req.board = board;
         return next();
       }
 
-      // Board creator always has full access regardless of visibility
+      // Board creator always has full access
       if (board.createdBy?.toString() === userId) {
         req.board = board;
         return next();
       }
 
-      // User role
-      if (board.permissions.visibility === 'organization') {
+      // Default permissions if not set
+      const perms = board.permissions || {};
+      const visibility = perms.visibility || 'organization';
+
+      if (visibility === 'organization') {
         req.board = board;
         return next();
       }
 
-      if (board.permissions.visibility === 'restricted') {
-        const isAllowedUser = board.permissions.allowedUsers
-          .some(id => id.toString() === userId);
-
+      if (visibility === 'restricted') {
+        const isAllowedUser = (perms.allowedUsers || []).some(id => id.toString() === userId);
         if (!isAllowedUser) {
           return res.status(403).json({ error: 'No access to this board' });
         }

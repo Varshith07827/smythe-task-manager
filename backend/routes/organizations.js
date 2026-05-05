@@ -131,11 +131,17 @@ router.get('/:id/automations', authenticate, authorize('admin'), async (req, res
     const automations = org.settings?.automations || {};
     res.json({
       deadlineReminder: {
-        enabled: automations.deadlineReminder?.enabled !== false,
+        enabled:       automations.deadlineReminder?.enabled !== false,
+        cronMode:      automations.deadlineReminder?.cronMode || 'internal',
+        webhookUrl:    automations.deadlineReminder?.webhookUrl || '',
+        webhookSecret: automations.deadlineReminder?.webhookSecret || '',
         cronExpression: process.env.DEADLINE_REMINDER_CRON || '*/30 * * * *'
       },
       progressDigest: {
-        enabled: automations.progressDigest?.enabled !== false,
+        enabled:       automations.progressDigest?.enabled !== false,
+        cronMode:      automations.progressDigest?.cronMode || 'internal',
+        webhookUrl:    automations.progressDigest?.webhookUrl || '',
+        webhookSecret: automations.progressDigest?.webhookSecret || '',
         cronExpression: process.env.PROGRESS_DIGEST_CRON || '0 */4 * * *'
       }
     });
@@ -155,10 +161,24 @@ router.patch('/:id/automations', authenticate, authorize('admin'), async (req, r
     const { deadlineReminder, progressDigest } = req.body;
     const update = {};
     if (deadlineReminder !== undefined) {
-      update['settings.automations.deadlineReminder.enabled'] = !!deadlineReminder.enabled;
+      if (deadlineReminder.enabled !== undefined)
+        update['settings.automations.deadlineReminder.enabled'] = !!deadlineReminder.enabled;
+      if (deadlineReminder.cronMode !== undefined)
+        update['settings.automations.deadlineReminder.cronMode'] = deadlineReminder.cronMode;
+      if (deadlineReminder.webhookUrl !== undefined)
+        update['settings.automations.deadlineReminder.webhookUrl'] = deadlineReminder.webhookUrl;
+      if (deadlineReminder.webhookSecret !== undefined)
+        update['settings.automations.deadlineReminder.webhookSecret'] = deadlineReminder.webhookSecret;
     }
     if (progressDigest !== undefined) {
-      update['settings.automations.progressDigest.enabled'] = !!progressDigest.enabled;
+      if (progressDigest.enabled !== undefined)
+        update['settings.automations.progressDigest.enabled'] = !!progressDigest.enabled;
+      if (progressDigest.cronMode !== undefined)
+        update['settings.automations.progressDigest.cronMode'] = progressDigest.cronMode;
+      if (progressDigest.webhookUrl !== undefined)
+        update['settings.automations.progressDigest.webhookUrl'] = progressDigest.webhookUrl;
+      if (progressDigest.webhookSecret !== undefined)
+        update['settings.automations.progressDigest.webhookSecret'] = progressDigest.webhookSecret;
     }
     if (!Object.keys(update).length) {
       return res.status(400).json({ error: 'No valid fields to update' });
