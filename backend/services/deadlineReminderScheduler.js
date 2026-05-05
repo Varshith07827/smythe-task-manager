@@ -4,11 +4,7 @@ const User = require('../models/User');
 const Notification = require('../models/Notification');
 const notificationService = require('./notificationService');
 
-/**
- * Runs every 30 minutes to check for upcoming deadlines and overdue tasks.
- * Respects each user's deadlineReminderHours preference and quiet hours.
- */
-const CRON_EXPRESSION = '*/30 * * * *';
+const CRON_EXPRESSION = process.env.DEADLINE_REMINDER_CRON || '*/30 * * * *';
 
 /**
  * Check if current time is within a user's quiet hours.
@@ -37,10 +33,22 @@ function isQuietHours(user) {
 async function runDeadlineCheck() {
   const now = new Date();
   const Board = require('../models/Board');
+  const Organization = require('../models/Organization');
 
-  // Find all archived board IDs to exclude their tasks
-  const archivedBoards = await Board.find({ archived: true }).select('_id').lean();
-  const archivedBoardIds = archivedBoards.map(b => b._id);
+  // Orgs that have disabled deadline reminders
+  const disabledOrgs = await Organization.find({
+    'settings.automations.deadlineReminder.enabled': false
+  }).select('_id').lean();
+  const disabledOrgIds = disabledOrgs.map(o => o._id);
+
+  // Boards to exclude: archived OR belonging to a disabled org
+  const excludedBoards = await Board.find({
+    $or: [
+      { archived: true },
+      ...(disabledOrgIds.length ? [{ organization: { $in: disabledOrgIds } }] : [])
+    ]
+  }).select('_id').lean();
+  const archivedBoardIds = excludedBoards.map(b => b._id);
 
   // Find all non-archived tasks with a dueDate that have assignees (excluding archived boards)
   const tasks = await Task.find({
@@ -155,16 +163,22 @@ async function runDeadlineCheck() {
 }
 
 function start() {
-  cron.schedule(CRON_EXPRESSION, () => {
-    runDeadlineCheck().catch((err) => console.error('[DeadlineReminder]', err.message));
-  });
+  if (!cron.validate(CRON_EXPRESSION)) {
+    console.error(`[DeadlineReminder] Invalid cron expression: "${CRON_EXPRESSION}" — falling back to */30 * * * *`);
+    cron.schedule('*/30 * * * *', () => {
+      runDeadlineCheck().catch((err) => console.error('[DeadlineReminder]', err.message));
+    });
+  } else {
+    cron.schedule(CRON_EXPRESSION, () => {
+      runDeadlineCheck().catch((err) => console.error('[DeadlineReminder]', err.message));
+    });
+  }
 
-  // Also run once on startup after a short delay (let DB connections settle)
   setTimeout(() => {
     runDeadlineCheck().catch((err) => console.error('[DeadlineReminder] initial run:', err.message));
   }, 10000);
 
-  console.log('[DeadlineReminder] cron scheduled: every 30 minutes');
+  console.log(`[DeadlineReminder] cron scheduled: ${CRON_EXPRESSION}`);
 }
 
 module.exports = { start, runDeadlineCheck };

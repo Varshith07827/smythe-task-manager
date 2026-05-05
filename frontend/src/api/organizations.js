@@ -4,6 +4,9 @@ export const organizationsApi = {
   get: (id) => api.get(`/organizations/${id}`),
   update: (id, data) => api.patch(`/organizations/${id}`, data),
   getPublicBranding: () => api.get('/organizations/branding/public'),
+  getAutomations: (id) => api.get(`/organizations/${id}/automations`),
+  updateAutomations: (id, data) => api.patch(`/organizations/${id}/automations`, data),
+  triggerAutomation: (id, job) => api.post(`/organizations/${id}/automations/trigger/${job}`),
   uploadBrandingFile: (id, file, field) => {
     const form = new FormData();
     form.append('file', file);

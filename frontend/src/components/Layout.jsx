@@ -119,24 +119,72 @@ export default function Layout() {
   const navClass = ({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`;
   const mobileLinkClass = ({ isActive }) => `main-toolbar-mobile-link ${isActive ? 'active' : ''}`;
 
+  const brandMark = useMemo(() => {
+    const words = appName.trim().split(/\s+/);
+    if (words.length >= 2) {
+      return (words[0][0] + words[1][0]).toUpperCase();
+    }
+    return appName.charAt(0).toUpperCase();
+  }, [appName]);
+
+
+  const headerPngUrl = useMemo(() => {
+    const primaryLogo = branding.logoUrl || '';
+    return /\.png(?:$|[?#])/i.test(primaryLogo) ? primaryLogo : '';
+  }, [branding.logoUrl]);
+
+  const headerLogoHeightPx = useMemo(() => {
+    // Prefer the unified logoSize slider; fall back to legacy headerLogoHeight.
+    const raw = Number(branding.logoSize ?? branding.headerLogoHeight);
+    const safeHeight = Number.isFinite(raw) ? raw : 36;
+    return Math.min(120, Math.max(16, safeHeight));
+  }, [branding.logoSize, branding.headerLogoHeight]);
+
+  const headerLogoScaleFactor = useMemo(() => {
+    const rawScale = Number(branding.headerLogoScale);
+    const safeScale = Number.isFinite(rawScale) ? rawScale : 1;
+    return Math.min(2, Math.max(0.5, safeScale));
+  }, [branding.headerLogoScale]);
+
+  const desktopHeaderLogoHeight = Math.round(headerLogoHeightPx * headerLogoScaleFactor);
+  const mobileHeaderLogoHeight = Math.round(Math.max(16, headerLogoHeightPx * headerLogoScaleFactor * 0.78));
+
   const effectiveOpen = sidebarOpen;
 
   return (
     <div className="app-layout">
       <aside id="app-sidebar" className={`sidebar${effectiveOpen ? ' sidebar--open' : ''}`} aria-label="Main navigation">
         <div className="sidebar-brand">
-          {branding.logoUrl ? (
-            <img src={branding.logoUrl} alt={appName} className="sidebar-brand-logo" style={{
-              height: 28, width: 28, objectFit: 'cover',
-              borderRadius: branding.logoShape === 'circle' ? '50%' : branding.logoShape === 'square' ? 3 : 6
-            }} />
-          ) : (
-            <span className="sidebar-brand-mark">{appName[0]}</span>
-          )}
-          <div className="sidebar-brand-text">
-            <span className="sidebar-brand-name">{appName}</span>
-            <span className="sidebar-brand-tagline">{branding.tagline || 'Task Management'}</span>
+          <div className="sidebar-brand-left">
+            {branding.logoUrl ? (
+              <img src={branding.logoUrl} alt={appName} className="sidebar-brand-logo" style={{
+                height: 32, width: 32, objectFit: 'cover',
+                borderRadius: branding.logoShape === 'circle' ? '50%' : branding.logoShape === 'square' ? 4 : 8
+              }} />
+            ) : (
+              <span className="sidebar-brand-mark">{brandMark}</span>
+            )}
+            <div className="sidebar-brand-text">
+              <span className="sidebar-brand-name">{appName}</span>
+              <span className="sidebar-brand-tagline">{branding.tagline || 'Task Management'}</span>
+            </div>
           </div>
+          <button
+            type="button"
+            className="sidebar-collapse-btn"
+            onClick={() => setSidebarOpen(v => !v)}
+            aria-expanded={effectiveOpen}
+            aria-controls="app-sidebar"
+            aria-label={effectiveOpen ? 'Collapse sidebar' : 'Expand sidebar'}
+            title={effectiveOpen ? 'Collapse' : 'Expand'}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              {effectiveOpen
+                ? <polyline points="15 18 9 12 15 6" />
+                : <polyline points="9 18 15 12 9 6" />
+              }
+            </svg>
+          </button>
         </div>
 
         <nav className="sidebar-nav">
@@ -164,12 +212,14 @@ export default function Layout() {
               </svg>
               <span className="sidebar-link-label">Notifications</span>
             </NavLink>
-            <NavLink to="/archived" className={navClass} title="Archived">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-                <polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5" rx="1"/><line x1="10" y1="12" x2="14" y2="12"/>
-              </svg>
-              <span className="sidebar-link-label">Archived</span>
-            </NavLink>
+            {user?.role === 'admin' && (
+              <NavLink to="/archived" className={navClass} title="Archived">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                  <polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5" rx="1"/><line x1="10" y1="12" x2="14" y2="12"/>
+                </svg>
+                <span className="sidebar-link-label">Archived</span>
+              </NavLink>
+            )}
             {user?.role === 'admin' && (
               <NavLink to="/logs" className={navClass} title="Logs">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -294,29 +344,46 @@ export default function Layout() {
 
       <main className="main-content">
         <header className="main-toolbar">
-          <button
-            type="button"
-            className="main-menu-toggle"
-            onClick={() => setSidebarOpen(v => !v)}
-            aria-expanded={effectiveOpen}
-            aria-controls="app-sidebar"
-            aria-label={effectiveOpen ? 'Collapse navigation' : 'Expand navigation'}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <path d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          </button>
+          <div className="desktop-header-brand">
+            {headerPngUrl ? (
+              <img
+                src={headerPngUrl}
+                alt={appName}
+                className="header-logo"
+                style={{
+                  height: desktopHeaderLogoHeight,
+                  width: 'auto',
+                  objectFit: 'contain'
+                }}
+              />
+            ) : (
+              <span style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em', lineHeight: 1 }}>
+                {appName}
+              </span>
+            )}
+          </div>
           <div className="main-toolbar-mobile-cluster">
-            <span className="main-toolbar-mobile-brand">{appName}</span>
-            <nav className="main-toolbar-mobile-nav" aria-label="Mobile">
-              <NavLink to="/" end className={mobileLinkClass}>Home</NavLink>
-              <NavLink to="/settings" className={mobileLinkClass}>Settings</NavLink>
-              <NavLink to="/notifications" className={mobileLinkClass}>Alerts</NavLink>
-              <NavLink to="/profile" className={mobileLinkClass}>Profile</NavLink>
-            </nav>
+            {headerPngUrl ? (
+              <div className="mobile-header-brand">
+                <img
+                  src={headerPngUrl}
+                  alt={appName}
+                  style={{ height: mobileHeaderLogoHeight, width: 'auto', objectFit: 'contain', flexShrink: 0 }}
+                />
+              </div>
+            ) : (
+              <div className="mobile-header-brand">
+                <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em', lineHeight: 1 }}>
+                  {appName}
+                </span>
+              </div>
+            )}
+            <div className="mobile-header-actions">
+              <NotificationBell />
+            </div>
           </div>
           <div className="main-toolbar-spacer" />
-          <NotificationBell />
+          <div className="desktop-only-bell"><NotificationBell /></div>
           <div className="header-profile" ref={profileRef}>
             <button
               className="header-profile-btn"
@@ -374,6 +441,35 @@ export default function Layout() {
           <Outlet />
         </div>
       </main>
+      {createPortal(
+        <nav className="mobile-bottom-nav" aria-label="Mobile navigation">
+          <NavLink to="/" end className={mobileLinkClass}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/>
+            </svg>
+            <span>Home</span>
+          </NavLink>
+          <NavLink to="/notifications" className={mobileLinkClass}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/>
+            </svg>
+            <span>Alerts</span>
+          </NavLink>
+          <NavLink to="/settings" className={mobileLinkClass}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
+            </svg>
+            <span>Settings</span>
+          </NavLink>
+          <NavLink to="/profile" className={mobileLinkClass}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>
+            </svg>
+            <span>Profile</span>
+          </NavLink>
+        </nav>,
+        document.body
+      )}
     </div>
   );
 }

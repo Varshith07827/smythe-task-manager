@@ -15,10 +15,12 @@ const brandingUpload = multer({
     destination: (req, file, cb) => cb(null, BRANDING_DIR),
     filename: (req, file, cb) => cb(null, `${uuidv4()}${path.extname(file.originalname)}`)
   }),
-  limits: { fileSize: 2 * 1024 * 1024 },
+  limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
-    const allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml', 'image/x-icon', 'image/vnd.microsoft.icon'];
-    cb(null, allowed.includes(file.mimetype));
+    const ext = path.extname(file.originalname || '').toLowerCase();
+    const isPngMime = file.mimetype === 'image/png';
+    const isPngExt = ext === '.png';
+    cb(null, isPngMime && isPngExt);
   }
 });
 
@@ -34,10 +36,10 @@ router.get('/branding/public', async (req, res) => {
   try {
     // Get the most recently updated org's branding + signup setting
     const org = await Organization.findOne().sort({ updatedAt: -1 }).select('branding settings.allowSignup').lean();
-    const defaults = { appTitle: 'Smythe', tagline: '', logoUrl: '', logoShape: 'rounded', accentColor: '#0a84ff', logoSize: 48, faviconUrl: '', siteTitle: '', sidebarColor: '#1a1a2e' };
+    const defaults = { appTitle: 'Smythe', tagline: '', logoUrl: '', logoShape: 'rounded', accentColor: '#0a84ff', logoSize: 48, showLogoInHeader: true, showLogoInSidebar: true, headerLogoUrl: '', headerLogoHeight: 36, showNameInHeader: true, faviconUrl: '', siteTitle: '', sidebarColor: '#1a1a2e' };
     res.json({ ...defaults, ...org?.branding, allowSignup: org?.settings?.allowSignup || false });
   } catch (err) {
-    res.json({ appTitle: 'Smythe', tagline: '', logoUrl: '', logoShape: 'rounded', accentColor: '#0a84ff', logoSize: 48, faviconUrl: '', siteTitle: '', sidebarColor: '#1a1a2e', allowSignup: false });
+    res.json({ appTitle: 'Smythe', tagline: '', logoUrl: '', logoShape: 'rounded', accentColor: '#0a84ff', logoSize: 48, showLogoInHeader: true, showLogoInSidebar: true, headerLogoUrl: '', headerLogoHeight: 36, showNameInHeader: true, faviconUrl: '', siteTitle: '', sidebarColor: '#1a1a2e', allowSignup: false });
   }
 });
 
@@ -84,7 +86,7 @@ router.patch('/:id', authenticate, authorize('admin'), async (req, res) => {
 // Upload branding image (logo or favicon)
 router.post('/:id/branding/upload', authenticate, authorize('admin'), brandingUpload.single('file'), async (req, res) => {
   try {
-    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+    if (!req.file) return res.status(400).json({ error: 'Only PNG files are allowed' });
     const field = req.body.field; // 'logoUrl' or 'faviconUrl'
     if (!['logoUrl', 'faviconUrl'].includes(field)) {
       return res.status(400).json({ error: 'field must be logoUrl or faviconUrl' });
@@ -115,6 +117,96 @@ router.post('/:id/branding/upload', authenticate, authorize('admin'), brandingUp
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// Automation config — GET returns current settings, PATCH updates them
+router.get('/:id/automations', authenticate, authorize('admin'), async (req, res) => {
+  try {
+    const userOrgId = req.user.organization?.toString();
+    if (userOrgId !== req.params.id) {
+      return res.status(403).json({ error: 'Cannot access another organization' });
+    }
+    const org = await Organization.findById(req.params.id).select('settings.automations').lean();
+    if (!org) return res.status(404).json({ error: 'Organization not found' });
+    const automations = org.settings?.automations || {};
+    res.json({
+      deadlineReminder: {
+        enabled: automations.deadlineReminder?.enabled !== false,
+        cronExpression: process.env.DEADLINE_REMINDER_CRON || '*/30 * * * *'
+      },
+      progressDigest: {
+        enabled: automations.progressDigest?.enabled !== false,
+        cronExpression: process.env.PROGRESS_DIGEST_CRON || '0 */4 * * *'
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.patch('/:id/automations', authenticate, authorize('admin'), async (req, res) => {
+  try {
+    const orgId = req.params.id;
+    const userOrgId = req.user.organization?.toString();
+    if (userOrgId !== orgId) {
+      return res.status(403).json({ error: 'Cannot modify another organization' });
+    }
+
+    const { deadlineReminder, progressDigest } = req.body;
+    const update = {};
+    if (deadlineReminder !== undefined) {
+      update['settings.automations.deadlineReminder.enabled'] = !!deadlineReminder.enabled;
+    }
+    if (progressDigest !== undefined) {
+      update['settings.automations.progressDigest.enabled'] = !!progressDigest.enabled;
+    }
+    if (!Object.keys(update).length) {
+      return res.status(400).json({ error: 'No valid fields to update' });
+    }
+    await Organization.findByIdAndUpdate(orgId, { $set: update });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Manual triggers — for use with external cron services (cron-job.org, GitHub Actions, etc.)
+router.post('/:id/automations/trigger/deadline-reminder', authenticate, authorize('admin'), async (req, res) => {
+  try {
+    const userOrgId = req.user.organization?.toString();
+    if (userOrgId !== req.params.id) {
+      return res.status(403).json({ error: 'Cannot trigger for another organization' });
+    }
+    const { runDeadlineCheck } = require('../services/deadlineReminderScheduler');
+    await runDeadlineCheck();
+    res.json({ ok: true, triggered: 'deadline-reminder' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/:id/automations/trigger/progress-digest', authenticate, authorize('admin'), async (req, res) => {
+  try {
+    const userOrgId = req.user.organization?.toString();
+    if (userOrgId !== req.params.id) {
+      return res.status(403).json({ error: 'Cannot trigger for another organization' });
+    }
+    const { runProgressDigestTick } = require('../services/progressDigestScheduler');
+    await runProgressDigestTick();
+    res.json({ ok: true, triggered: 'progress-digest' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({ error: 'PNG file is too large. Max size is 10MB.' });
+    }
+    return res.status(400).json({ error: err.message });
+  }
+  return next(err);
 });
 
 module.exports = router;

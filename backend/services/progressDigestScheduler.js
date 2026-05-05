@@ -3,10 +3,17 @@ const Board = require('../models/Board');
 const Task = require('../models/Task');
 const notificationService = require('./notificationService');
 
-/** Wall-clock every 4 hours (UTC minute 0). */
-const CRON_EXPRESSION = '0 */4 * * *';
+const CRON_EXPRESSION = process.env.PROGRESS_DIGEST_CRON || '0 */4 * * *';
 
 async function runProgressDigestTick() {
+  const Organization = require('../models/Organization');
+
+  // Orgs that have disabled progress digest
+  const disabledOrgs = await Organization.find({
+    'settings.automations.progressDigest.enabled': false
+  }).select('_id').lean();
+  const disabledOrgIds = new Set(disabledOrgs.map(o => o._id.toString()));
+
   const boards = await Board.find({
     'progressDigest.enabled': true,
     archived: { $ne: true }
@@ -15,6 +22,7 @@ async function runProgressDigestTick() {
     .lean();
 
   for (const board of boards) {
+    if (disabledOrgIds.has(board.organization?.toString())) continue;
     const tasks = await Task.find({
       board: board._id,
       archived: { $ne: true },
@@ -49,10 +57,17 @@ async function runProgressDigestTick() {
 }
 
 function start() {
-  cron.schedule(CRON_EXPRESSION, () => {
-    runProgressDigestTick().catch((err) => console.error('[ProgressDigest]', err.message));
-  });
-  console.log('[ProgressDigest] cron scheduled: every 4 hours');
+  if (!cron.validate(CRON_EXPRESSION)) {
+    console.error(`[ProgressDigest] Invalid cron expression: "${CRON_EXPRESSION}" — falling back to 0 */4 * * *`);
+    cron.schedule('0 */4 * * *', () => {
+      runProgressDigestTick().catch((err) => console.error('[ProgressDigest]', err.message));
+    });
+  } else {
+    cron.schedule(CRON_EXPRESSION, () => {
+      runProgressDigestTick().catch((err) => console.error('[ProgressDigest]', err.message));
+    });
+  }
+  console.log(`[ProgressDigest] cron scheduled: ${CRON_EXPRESSION}`);
 }
 
 module.exports = { start, runProgressDigestTick };

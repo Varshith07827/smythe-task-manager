@@ -10,6 +10,37 @@ import { useBranding } from '../context/BrandingContext';
 import { motion } from 'framer-motion';
 import { alert } from '../components/AlertSystem';
 
+const colorTones = {
+  warm: [
+    { color: '#ef4444', label: 'Red' }, { color: '#f97316', label: 'Orange' },
+    { color: '#f59e0b', label: 'Amber' }, { color: '#eab308', label: 'Yellow' },
+    { color: '#f43f5e', label: 'Rose' }, { color: '#ea580c', label: 'Dark Orange' },
+  ],
+  cool: [
+    { color: '#3b82f6', label: 'Sky' }, { color: '#0a84ff', label: 'Standard Blue' },
+    { color: '#6366f1', label: 'Indigo' }, { color: '#0ea5e9', label: 'Cyan' },
+    { color: '#14b8a6', label: 'Teal' }, { color: '#0284c7', label: 'Ocean' }
+  ],
+  pastel: [
+    { color: '#fca5a5', label: 'Soft Red' }, { color: '#fdba74', label: 'Soft Orange' },
+    { color: '#93c5fd', label: 'Soft Blue' }, { color: '#a78bfa', label: 'Soft Purple' },
+    { color: '#a7f3d0', label: 'Soft Emerald' }, { color: '#fbcfe8', label: 'Soft Pink' },
+  ],
+  vivid: [
+    { color: '#ef0000', label: 'Neon Red' }, { color: '#10b981', label: 'Neon Green' },
+    { color: '#d946ef', label: 'Neon Fuchsia' }, { color: '#06b6d4', label: 'Neon Cyan' },
+    { color: '#8b5cf6', label: 'Vibrant Purple' }, { color: '#ec4899', label: 'Vibrant Pink' },
+  ]
+};
+
+const defaultColorMixes = [
+  { name: 'Midnight Blue', accent: '#3b82f6', sidebar: '#1e293b' },
+  { name: 'Forest', accent: '#10b981', sidebar: '#14532d' },
+  { name: 'Sunset', accent: '#f97316', sidebar: '#450a0a' },
+  { name: 'Royal', accent: '#8b5cf6', sidebar: '#3b0764' },
+  { name: 'Classic', accent: '#0a84ff', sidebar: '#1a1a2e' },
+];
+
 export default function Settings() {
   const { user, setUser } = useAuth();
   const navigate = useNavigate();
@@ -21,6 +52,7 @@ export default function Settings() {
   const [activeTab, setActiveTab] = useState('users');
   const [savingMemberNotifyId, setSavingMemberNotifyId] = useState(null);
   const [branding, setBranding] = useState({ appTitle: 'Smythe', tagline: '', logoUrl: '', logoShape: 'rounded', accentColor: '#0a84ff', logoSize: 48, faviconUrl: '', siteTitle: '', sidebarColor: '#1a1a2e' });
+  const [activeColorTone, setActiveColorTone] = useState('warm');
   const [allowSignup, setAllowSignup] = useState(false);
   const [brandingLoading, setBrandingLoading] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(null);
@@ -51,7 +83,7 @@ export default function Settings() {
       organizationsApi.get(orgId).then(res => {
         if (res.data?.branding) setBranding(b => ({ ...b, ...res.data.branding }));
         if (res.data?.settings?.allowSignup !== undefined) setAllowSignup(res.data.settings.allowSignup);
-      }).catch(() => {});
+      }).catch(() => { });
     }
   }, [user, loadMembers]);
 
@@ -228,9 +260,9 @@ export default function Settings() {
           {/* Users */}
           <CollapsibleCard title={`Team users (${members.length})`} defaultOpen>
             <div style={{ padding: '0 16px 12px' }}>
-              <input 
-                className="form-input search-input" 
-                placeholder="Search users by name or email..." 
+              <input
+                className="form-input search-input"
+                placeholder="Search users by name or email..."
                 value={userSearch}
                 onChange={e => setUserSearch(e.target.value)}
                 style={{ width: '100%', maxWidth: 300 }}
@@ -239,9 +271,9 @@ export default function Settings() {
             {members.length === 0 ? (
               <p style={{ fontSize: 13, color: 'var(--text-tertiary)', padding: '0 16px' }}>No team users yet.</p>
             ) : (
-              members.filter(m => 
-                !userSearch || 
-                m.name.toLowerCase().includes(userSearch.toLowerCase()) || 
+              members.filter(m =>
+                !userSearch ||
+                m.name.toLowerCase().includes(userSearch.toLowerCase()) ||
                 m.email.toLowerCase().includes(userSearch.toLowerCase())
               ).map(m => {
                 const mp = normalizeNotificationPrefs(m.notificationPreferences);
@@ -279,7 +311,7 @@ export default function Settings() {
                       )}
                       {user?.role === 'admin' && m._id !== user._id ? (
                         <button className="btn btn-ghost btn-xs" onClick={() => setConfirmRemove(m)} title="Remove" style={{ flexShrink: 0 }}>
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--red)" strokeWidth="1.8" strokeLinecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--red)" strokeWidth="1.8" strokeLinecap="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" /></svg>
                         </button>
                       ) : (
                         <span aria-hidden="true" style={{ width: 28, height: 28, flexShrink: 0 }} />
@@ -348,7 +380,7 @@ export default function Settings() {
             </p>
             <button className="btn btn-secondary" onClick={() => { setSupportPasswordInput(''); setShowSupportPasswordPrompt(true); }}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0110 0v4" />
               </svg>
               Contact Support
             </button>
@@ -369,7 +401,7 @@ export default function Settings() {
             <div className="modal-header">
               <h3>Verify Identity</h3>
               <button className="modal-close" onClick={() => setShowSupportPasswordPrompt(false)}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
               </button>
             </div>
             <div className="modal-body" style={{ padding: '16px 24px 24px' }}>
@@ -442,7 +474,7 @@ export default function Settings() {
             <div className="modal-header">
               <h3>Support & Help</h3>
               <button className="modal-close" onClick={() => { setShowPasswordSupport(false); setSupportSubject(''); setSupportDetails(''); }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
               </button>
             </div>
             <div className="modal-body" style={{ padding: '16px 24px 24px' }}>
@@ -594,8 +626,70 @@ export default function Settings() {
                   </div>
                 )}
               </div>
+              <div style={{ height: 1, background: 'var(--border)' }} />
+
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label" style={{ fontSize: 14, fontWeight: 600 }}>Pre-defined Theme Mixes</label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 }}>
+                  {defaultColorMixes.map(mix => (
+                    <button
+                      key={mix.name}
+                      type="button"
+                      onClick={() => setBranding(b => ({ ...b, accentColor: mix.accent, sidebarColor: mix.sidebar }))}
+                      style={{
+                        padding: '10px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        border: branding.accentColor === mix.accent && branding.sidebarColor === mix.sidebar ? '2px solid var(--accent)' : '1px solid var(--border)',
+                        borderRadius: 'var(--radius-sm)', background: 'var(--bg-tertiary)', cursor: 'pointer', transition: 'all 0.15s'
+                      }}
+                    >
+                      <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>{mix.name}</span>
+                      <div style={{ display: 'flex', gap: 2 }}>
+                        <div style={{ width: 14, height: 14, borderRadius: '50%', background: mix.accent, border: '1px solid var(--border)', zIndex: 1 }} />
+                        <div style={{ width: 14, height: 14, borderRadius: '50%', background: mix.sidebar, border: '1px solid var(--border)', marginLeft: -6 }} />
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ height: 1, background: 'var(--border)' }} />
+
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <label className="form-label">Accent Color</label>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                  {Object.keys(colorTones).map(tone => (
+                    <button
+                      key={tone}
+                      type="button"
+                      onClick={() => setActiveColorTone(tone)}
+                      style={{
+                        flex: 1, padding: '6px 8px', fontSize: 12, textTransform: 'capitalize', fontWeight: 550,
+                        background: activeColorTone === tone ? 'var(--accent)' : 'var(--bg-tertiary)',
+                        color: activeColorTone === tone ? '#fff' : 'var(--text-secondary)',
+                        border: '1px solid', borderColor: activeColorTone === tone ? 'var(--accent)' : 'var(--border)',
+                        borderRadius: 'var(--radius-sm)', cursor: 'pointer', transition: 'all 0.15s'
+                      }}
+                    >
+                      {tone}
+                    </button>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
+                  {colorTones[activeColorTone].map(preset => (
+                    <button
+                      key={preset.color}
+                      type="button"
+                      onClick={() => setBranding(b => ({ ...b, accentColor: preset.color }))}
+                      title={preset.label}
+                      style={{
+                        width: 34, height: 34, borderRadius: 6, background: preset.color, cursor: 'pointer',
+                        border: branding.accentColor === preset.color ? '2px solid var(--text-primary)' : '2px solid var(--border)',
+                        outline: branding.accentColor === preset.color ? '2px solid var(--text-primary)' : 'none',
+                        outlineOffset: 1, transition: 'all 0.15s'
+                      }}
+                    />
+                  ))}
+                </div>
                 <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
                   <input
                     type="color"

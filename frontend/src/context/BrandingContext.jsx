@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { organizationsApi } from '../api/organizations';
 
-const defaults = { appTitle: 'Smythe', tagline: '', logoUrl: '', logoShape: 'rounded', accentColor: '#0a84ff', logoSize: 48, faviconUrl: '', siteTitle: '', sidebarColor: '#1a1a2e', allowSignup: false };
+const defaults = { appTitle: 'Smythe', tagline: '', logoUrl: '', logoShape: 'rounded', accentColor: '#0a84ff', logoSize: 48, headerLogoUrl: '', headerLogoHeight: 36, headerLogoScale: 1, faviconUrl: '', siteTitle: '', sidebarColor: '#1a1a2e', allowSignup: false, showLogoInHeader: true, showLogoInSidebar: true, showFaviconInSidebar: true, showNameInHeader: true, useSameLogo: true };
 
 function hexToRgb(hex) {
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);

@@ -27,7 +27,7 @@ const getEditableFields = (role, board) => {
       'priority', 'dueDate', 'startDate', 'columnValues', 'order',
       'parentTask', 'archived'
     ],
-    user: ['status', 'columnValues', 'comments']
+    user: ['title', 'description', 'assignedTo', 'dueDate', 'startDate', 'priority', 'status', 'columnValues', 'comments']
   };
 
   if (role === 'user' && board?.permissions?.userEditableColumns?.length > 0) {

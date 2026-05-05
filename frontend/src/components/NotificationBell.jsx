@@ -19,7 +19,16 @@ export default function NotificationBell() {
   const updatePanelPos = useCallback(() => {
     if (!ref.current) return;
     const rect = ref.current.getBoundingClientRect();
-    setPanelPos({ top: rect.bottom + 10, right: window.innerWidth - rect.right - 8 });
+    const isMobile = window.innerWidth <= 768;
+    if (isMobile) {
+      const panelWidth = Math.min(window.innerWidth - 16, 380);
+      // Center under the bell but clamp to viewport
+      let right = window.innerWidth - rect.right - 8;
+      right = Math.max(8, Math.min(right, window.innerWidth - panelWidth - 8));
+      setPanelPos({ top: rect.bottom + 8, right, width: panelWidth });
+    } else {
+      setPanelPos({ top: rect.bottom + 10, right: window.innerWidth - rect.right - 8, width: undefined });
+    }
   }, []);
 
   useEffect(() => {
@@ -112,7 +121,7 @@ export default function NotificationBell() {
             <motion.div
               className="notification-panel"
               ref={panelRef}
-              style={{ position: 'fixed', top: panelPos.top, right: panelPos.right }}
+              style={{ position: 'fixed', top: panelPos.top, right: panelPos.right, ...(panelPos.width ? { width: panelPos.width } : {}) }}
               initial={{ opacity: 0, y: -8, scale: 0.97 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -8, scale: 0.97 }}

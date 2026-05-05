@@ -31,8 +31,6 @@ export default function Dashboard() {
   const [boards, setBoards] = useState([]);
   const [archivedBoards, setArchivedBoards] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [retryCount, setRetryCount] = useState(0);
   const [showCreate, setShowCreate] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
@@ -101,7 +99,7 @@ export default function Dashboard() {
     } catch { return boardList; }
   }, [orderKey]);
 
-  useEffect(() => { loadBoards(); }, [retryCount]);
+  useEffect(() => { loadBoards(); }, []);
   useEffect(() => { localStorage.setItem('smythe:showStats', JSON.stringify(showStats)); }, [showStats]);
 
   // Sync pins when changed from sidebar
@@ -113,19 +111,11 @@ export default function Dashboard() {
 
   const loadBoards = async () => {
     try {
-      setLoading(true);
-      setError(null);
       const res = await boardsApi.getAll();
       setBoards(applyStoredOrder(res.data));
-      setLoading(false);
-    } catch (err) {
-      if (retryCount < 2) {
-        setTimeout(() => setRetryCount(c => c + 1), 1000);
-        return;
-      }
-      const errorMsg = err.response?.data?.error || err.message || 'Unknown error';
-      setError(`Unable to load projects: ${errorMsg}`);
-      alert.error(`Unable to load projects: ${errorMsg}`);
+    } catch {
+      alert.error('Unable to load your projects. Please refresh.');
+    } finally {
       setLoading(false);
     }
   };
@@ -216,24 +206,7 @@ export default function Dashboard() {
     ].filter(d => d.value > 0);
   }, [boards, archivedBoards]);
 
-  if (loading && !error) return <div className="loading-spinner"><div className="spinner" /></div>;
-
-  if (error) {
-    return (
-      <div className="empty-state" style={{ marginTop: 60 }}>
-        <div className="empty-state-icon">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--red)" strokeWidth="1.5" strokeLinecap="round">
-            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-          </svg>
-        </div>
-        <h3 style={{ color: 'var(--red)' }}>Connection Error</h3>
-        <p>{error}</p>
-        <div className="empty-state-actions">
-          <button type="button" className="btn btn-primary" onClick={() => setRetryCount(0)}>Try Again</button>
-        </div>
-      </div>
-    );
-  }
+  if (loading) return <div className="loading-spinner"><div className="spinner" /></div>;
 
   return (
     <motion.div variants={container} initial="hidden" animate="show">
@@ -367,8 +340,10 @@ export default function Dashboard() {
           <h3>No projects yet</h3>
           <p>Create your first project to start managing tasks</p>
           <div className="empty-state-actions">
-            <button type="button" className="btn btn-primary" onClick={() => setShowCreate(true)}>Create project</button>
-            <button type="button" className="btn btn-secondary" onClick={() => setShowImport(true)}>Import spreadsheet</button>
+            <>
+              <button type="button" className="btn btn-primary" onClick={() => setShowCreate(true)}>Create project</button>
+              <button type="button" className="btn btn-secondary" onClick={() => setShowImport(true)}>Import spreadsheet</button>
+            </>
           </div>
         </motion.div>
       ) : (
@@ -397,7 +372,7 @@ export default function Dashboard() {
               >
                 {board.color && <div className="board-card-color-bar" style={{ background: board.color }} />}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                  <h3 style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{board.title}</h3>
+                  <h3>{board.title}</h3>
                   <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
                     <button
                       className="board-card-menu"
@@ -409,7 +384,7 @@ export default function Dashboard() {
                         <line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 00-1.11-1.79l-1.78-.9A2 2 0 0115 10.76V6h1a2 2 0 000-4H8a2 2 0 000 4h1v4.76a2 2 0 01-1.11 1.79l-1.78.9A2 2 0 005 15.24z"/>
                       </svg>
                     </button>
-                    {(user?.role === 'admin' || board.createdBy === user?._id) && (
+                    {user?.role === 'admin' && (
                       <button
                         className="board-card-menu"
                         onClick={(e) => handleArchiveBoard(e, board._id, board.title)}
@@ -426,7 +401,12 @@ export default function Dashboard() {
                 </div>
                 <p>{board.description || 'No description'}</p>
                 <div className="board-card-meta">
-                  <span>Last Updated</span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ opacity: 0.6 }}>
+                      <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
+                    </svg>
+                    {board.taskCount ?? 0} item{(board.taskCount ?? 0) !== 1 ? 's' : ''}
+                  </span>
                   <span>{formatDistanceToNow(new Date(board.updatedAt || board.createdAt), { addSuffix: true })}</span>
                 </div>
               </motion.div>
@@ -463,34 +443,30 @@ export default function Dashboard() {
                     transition={{ delay: i * 0.05 }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                      <h3 style={{ opacity: 0.7, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{board.title}</h3>
+                      <h3 style={{ opacity: 0.7 }}>{board.title}</h3>
                       <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                        {(user?.role === 'admin' || board.createdBy === user?._id) && (
-                          <>
-                            <button
-                              className="btn btn-ghost btn-xs"
-                              onClick={(e) => handleRestoreBoard(e, board._id)}
-                              title="Restore project"
-                              style={{ fontSize: 11, gap: 4 }}
-                            >
-                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                                <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 105.64-12.5L1 10"/>
-                              </svg>
-                              Restore
-                            </button>
-                            <button
-                              className="btn btn-ghost btn-xs"
-                              onClick={(e) => handleDeleteBoard(e, board._id, board.title)}
-                              title="Delete permanently"
-                              style={{ fontSize: 11, gap: 4, color: 'var(--red)' }}
-                            >
-                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                                <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
-                              </svg>
-                              Delete
-                            </button>
-                          </>
-                        )}
+                        <button
+                          className="btn btn-ghost btn-xs"
+                          onClick={(e) => handleRestoreBoard(e, board._id)}
+                          title="Restore project"
+                          style={{ fontSize: 11, gap: 4 }}
+                        >
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                            <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 105.64-12.5L1 10"/>
+                          </svg>
+                          Restore
+                        </button>
+                        <button
+                          className="btn btn-ghost btn-xs"
+                          onClick={(e) => handleDeleteBoard(e, board._id, board.title)}
+                          title="Delete permanently"
+                          style={{ fontSize: 11, gap: 4, color: 'var(--red)' }}
+                        >
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                            <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                          </svg>
+                          Delete
+                        </button>
                       </div>
                     </div>
                     <p style={{ opacity: 0.6 }}>{board.description || 'No description'}</p>
@@ -514,8 +490,8 @@ export default function Dashboard() {
       </AnimatePresence>
 
       {showImport && (
-        <div className="modal-overlay" onClick={() => setShowImport(false)}>
-          <div className="modal modal-lg" onClick={e => e.stopPropagation()} style={{ maxWidth: 860 }}>
+        <div className="modal-overlay">
+          <div className="modal modal-lg" style={{ maxWidth: 860 }}>
             <div className="modal-header">
               <h3>Import from Spreadsheet</h3>
               <button className="modal-close" onClick={() => setShowImport(false)}>&times;</button>

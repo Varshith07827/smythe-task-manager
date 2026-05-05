@@ -43,30 +43,37 @@ const boardController = {
       if (role === 'admin') {
         query = { organization: orgId, archived: { $ne: true } };
       } else {
-        // Regular users: boards visible to the org, OR boards where they have assigned tasks
-        const assignedBoardIds = await Task.distinct('board', {
-          assignedTo: userId,
-          archived: { $ne: true }
-        });
+        // Regular users: boards they created OR have assigned tasks on
+        const [assignedBoardIds, createdBoardIds] = await Promise.all([
+          Task.distinct('board', { assignedTo: userId, archived: { $ne: true } }),
+          Board.distinct('_id', { createdBy: userId, organization: orgId, archived: { $ne: true } })
+        ]);
+        const allIds = [...new Set([
+          ...assignedBoardIds.map(id => id.toString()),
+          ...createdBoardIds.map(id => id.toString())
+        ])];
         query = {
           organization: orgId,
           archived: { $ne: true },
-          $or: [
-            { 'permissions.visibility': 'organization' },
-            { _id: { $in: assignedBoardIds } },
-            { 'permissions.allowedUsers': userId },
-            { 'permissions.allowedManagers': userId },
-            { createdBy: userId }
-          ]
+          _id: { $in: allIds }
         };
       }
 
       const boards = await Board.find(query)
-        .select('title description color createdAt columns permissions.visibility createdBy')
+        .select('title description color createdAt updatedAt columns permissions.visibility')
         .sort({ createdAt: -1 })
         .lean();
 
-      res.json(boards);
+      // Attach task counts
+      const boardIds = boards.map(b => b._id);
+      const taskCounts = await Task.aggregate([
+        { $match: { board: { $in: boardIds }, archived: { $ne: true } } },
+        { $group: { _id: '$board', count: { $sum: 1 } } }
+      ]);
+      const countMap = Object.fromEntries(taskCounts.map(t => [t._id.toString(), t.count]));
+      const boardsWithCount = boards.map(b => ({ ...b, taskCount: countMap[b._id.toString()] || 0 }));
+
+      res.json(boardsWithCount);
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
@@ -119,20 +126,8 @@ const boardController = {
   async getArchived(req, res) {
     try {
       const orgId = req.user.organization;
-      const query = { organization: orgId, archived: true };
-
-      if (req.user.role !== 'admin') {
-        const userId = req.user._id;
-        query.$or = [
-          { 'permissions.visibility': 'organization' },
-          { 'permissions.allowedUsers': userId },
-          { 'permissions.allowedManagers': userId },
-          { createdBy: userId }
-        ];
-      }
-
-      const boards = await Board.find(query)
-        .select('title description color createdAt columns permissions.visibility createdBy')
+      const boards = await Board.find({ organization: orgId, archived: true })
+        .select('title description color createdAt columns permissions.visibility')
         .sort({ createdAt: -1 })
         .lean();
       res.json(boards);

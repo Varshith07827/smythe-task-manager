@@ -28,9 +28,11 @@ router.patch('/me/notification-preferences', authenticate, userController.update
 router.post('/me/verify-password', authenticate, userController.verifyPassword);
 router.patch('/me/password', authenticate, userController.changePassword);
 router.post('/me/password-support', authenticate, userController.requestPasswordSupport);
+router.patch('/:id/profile', authenticate, authorize('admin'), userController.updateMemberProfile);
 router.patch('/:id/notification-preferences', authenticate, authorize('admin'), userController.updateMemberNotificationPreferences);
 router.patch('/:id/role', authenticate, authorize('admin'), userController.changeRole);
 router.patch('/:id/status', authenticate, authorize('admin'), userController.changeStatus);
+router.patch('/:id/restore', authenticate, authorize('admin'), userController.restoreUser);
 router.delete('/:id', authenticate, authorize('admin'), userController.removeUser);
 
 module.exports = router;

@@ -9,43 +9,32 @@ const checkBoardAccess = (requiredLevel = 'view') => {
       const board = await Board.findById(boardId);
       if (!board) return res.status(404).json({ error: 'Board not found' });
 
-      // Block access to archived boards except for restore and permanent delete operations
-      const isRestoreOrDeleteRoute = req.path?.endsWith('/restore') || req.originalUrl?.includes('/restore') || req.path?.endsWith('/permanent') || req.originalUrl?.includes('/permanent');
-      if (board.archived && !isRestoreOrDeleteRoute) {
-        return res.status(404).json({ error: 'Board not found' });
-      }
-
       const userId = req.user._id.toString();
       const role = req.user.role;
 
-      // System Admin has full access
+      // Admin has full access
       if (role === 'admin') {
         req.board = board;
         return next();
       }
 
-      const isCreator = board.createdBy && board.createdBy.toString() === userId;
-      const isManager = board.permissions?.allowedManagers?.some(id => id.toString() === userId);
-
-      // Require board admin rights for destructive/schema changes
-      if (requiredLevel === 'admin') {
-        if (isCreator || isManager) {
-          req.board = board;
-          return next();
-        }
-        return res.status(403).json({ error: 'Board admin access required' });
+      // Board creator always has full access regardless of visibility
+      if (board.createdBy?.toString() === userId) {
+        req.board = board;
+        return next();
       }
 
-      // User role checking for 'view' or 'edit' tasks
+      // User role
       if (board.permissions.visibility === 'organization') {
         req.board = board;
         return next();
       }
 
       if (board.permissions.visibility === 'restricted') {
-        const isAllowedUser = board.permissions?.allowedUsers?.some(id => id.toString() === userId);
+        const isAllowedUser = board.permissions.allowedUsers
+          .some(id => id.toString() === userId);
 
-        if (!isAllowedUser && !isManager && !isCreator) {
+        if (!isAllowedUser) {
           return res.status(403).json({ error: 'No access to this board' });
         }
       }
