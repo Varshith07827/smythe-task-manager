@@ -89,15 +89,13 @@ export default function Settings() {
 
   useEffect(() => {
     if (user) loadMembers();
-    if (user?.organization) {
-      const orgId = typeof user.organization === 'object' ? user.organization._id : user.organization;
-      organizationsApi.get(orgId).then(res => {
-        if (res.data?.branding) setBranding(b => ({ ...b, ...res.data.branding }));
-        if (res.data?.settings?.allowSignup !== undefined) setAllowSignup(res.data.settings.allowSignup);
-      }).catch(() => { });
-      if (user?.role === 'admin') {
-        organizationsApi.getAutomations(orgId).then(res => setAutomations(res.data)).catch(() => { });
-      }
+    // Single-org instance — just call /me, no ID needed
+    organizationsApi.get().then(res => {
+      if (res.data?.branding) setBranding(b => ({ ...b, ...res.data.branding }));
+      if (res.data?.settings?.allowSignup !== undefined) setAllowSignup(res.data.settings.allowSignup);
+    }).catch(() => { });
+    if (user?.role === 'admin') {
+      organizationsApi.getAutomations().then(res => setAutomations(res.data)).catch(() => { });
     }
   }, [user, loadMembers]);
 
@@ -191,8 +189,7 @@ export default function Settings() {
   const handleSaveBranding = async () => {
     setBrandingLoading(true);
     try {
-      const orgId = typeof user.organization === 'object' ? user.organization._id : user.organization;
-      await organizationsApi.update(orgId, { branding, settings: { allowSignup } });
+      await organizationsApi.update({ branding, settings: { allowSignup } });
       await refreshBranding();
       alert.success('Branding saved');
     } catch (err) {
@@ -221,8 +218,7 @@ export default function Settings() {
     const setLoading = field === 'logoUrl' ? setUploadingLogo : field === 'headerLogoUrl' ? setUploadingHeaderLogo : setUploadingFavicon;
     setLoading(true);
     try {
-      const orgId = typeof user.organization === 'object' ? user.organization._id : user.organization;
-      const res = await organizationsApi.uploadBrandingFile(orgId, file, field);
+      const res = await organizationsApi.uploadBrandingFile(file, field);
       setBranding(b => ({ ...b, [field]: res.data.url }));
       await refreshBranding();
       alert.success('File uploaded');
@@ -683,10 +679,9 @@ export default function Settings() {
                       job: 'progress-digest'
                     }
                   ].map(({ key, label, description, cron, envVar, job }) => {
-                    const orgId = typeof user?.organization === 'object' ? user.organization._id : user?.organization;
                     const isExternal = automations[key].cronMode === 'external';
                     const apiBase = window.location.origin.replace(':5173', ':5000').replace(':3000', ':5000');
-                    const triggerUrl = `${apiBase}/api/organizations/${orgId}/automations/trigger/${job}`;
+                    const triggerUrl = `${apiBase}/api/organizations/me/automations/trigger/${job}`;
                     const curlCmd = `curl -X POST "${triggerUrl}" \\\n  -H "Authorization: Bearer <your-admin-jwt>"`;
                     return (
                       <div key={key} style={{ padding: '16px', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-sm)', border: `1px solid ${isExternal ? 'var(--accent)' : 'var(--border)'}`, display: 'flex', flexDirection: 'column', gap: 14, transition: 'border-color 0.2s' }}>
@@ -774,7 +769,7 @@ export default function Settings() {
                                 onClick={async () => {
                                   setTriggeringJob(job);
                                   try {
-                                    await organizationsApi.triggerAutomation(orgId, job);
+                                    await organizationsApi.triggerAutomation(job);
                                     alert.success(`${label} triggered`);
                                   } catch {
                                     alert.error('Trigger failed.');
@@ -824,8 +819,7 @@ export default function Settings() {
                     onClick={async () => {
                       setSavingAutomations(true);
                       try {
-                        const orgId = typeof user.organization === 'object' ? user.organization._id : user.organization;
-                        await organizationsApi.updateAutomations(orgId, {
+                        await organizationsApi.updateAutomations({
                           deadlineReminder: {
                             enabled:       automations.deadlineReminder.enabled,
                             cronMode:      automations.deadlineReminder.cronMode || 'internal',

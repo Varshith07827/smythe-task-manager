@@ -11,15 +11,8 @@ const checkBoardAccess = (requiredLevel = 'view') => {
 
       const userId = req.user._id.toString();
       const role = req.user.role;
-      const userOrgId = req.user.organization?.toString();
-      const boardOrgId = board.organization?.toString();
 
-      // Org boundary check: users must belong to the same org as the board
-      if (userOrgId && boardOrgId && userOrgId !== boardOrgId) {
-        return res.status(403).json({ error: 'No access to this board' });
-      }
-
-      // Admin has full access within their org
+      // Admin has full access
       if (role === 'admin') {
         req.board = board;
         return next();

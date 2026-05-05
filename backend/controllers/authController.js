@@ -146,16 +146,12 @@ const authController = {
       const existing = await User.findOne({ email: pending.email });
       if (existing && existing.status !== 'inactive') return res.status(400).json({ error: 'An account with this email already exists.' });
 
-      // Find the default organization (first org in DB, or the one admins belong to)
+      // Find the single org for this instance
       let org = await Organization.findOne().sort({ createdAt: 1 });
 
       if (!org) {
-        // Need a creator — use any active admin, or a system placeholder
-        const anyAdmin = await User.findOne({ role: 'admin', status: 'active' }).select('_id').lean();
-        const creatorId = anyAdmin?._id || new (require('mongoose').Types.ObjectId)();
         org = await Organization.create({
           name: 'Default Organization',
-          creator: creatorId,
           members: [],
           inviteCode: crypto.randomBytes(8).toString('hex')
         });
@@ -247,12 +243,14 @@ const authController = {
       const user = new User({ name, email, password, role: 'admin', status: 'active' });
       await user.save();
 
-      const org = await Organization.create({
-        name: organizationName || `${name}'s Organization`,
-        creator: user._id,
-        members: [{ user: user._id, role: 'admin' }],
-        inviteCode: crypto.randomBytes(8).toString('hex')
-      });
+      let org = await Organization.findOne();
+      if (!org) {
+        org = await Organization.create({
+          name: organizationName || `${name}'s Organization`,
+          members: [{ user: user._id, role: 'admin' }],
+          inviteCode: crypto.randomBytes(8).toString('hex')
+        });
+      }
 
       user.organization = org._id;
       await user.save({ validateBeforeSave: false });
