@@ -14,6 +14,10 @@ const notificationService = {
     }
 
     const user = await User.findById(recipient);
+    if (!user) {
+      console.warn(`[NotificationService] Recipient ${recipient} not found — skipping`);
+      return null;
+    }
 
     const prefMap = {
       task_assigned: 'taskAssigned',
@@ -32,8 +36,11 @@ const notificationService = {
 
     if (type === 'status_changed' && newStatus) {
       const chosen = user?.notificationPreferences?.notifyOnStatuses;
-      if (Array.isArray(chosen)) {
-        if (chosen.length === 0) return null;
+      // Empty array or all 5 defaults = no filter (notify on ALL statuses including custom)
+      // Non-empty subset = whitelist only those statuses
+      const STANDARD = ['pending', 'in_progress', 'completed', 'blocked', 'cancelled'];
+      const isAllDefaults = Array.isArray(chosen) && STANDARD.every(s => chosen.includes(s));
+      if (Array.isArray(chosen) && chosen.length > 0 && !isAllDefaults) {
         if (!chosen.includes(newStatus)) return null;
       }
     } else if (type === 'status_changed' && !newStatus) {
@@ -113,6 +120,14 @@ const notificationService = {
     const branding = await emailService.getAppBranding(user.organization);
     const emailHtml = emailService.buildProgressDigestEmail(boardTitle, tasks, branding);
 
+    // Time-windowed groupKey to deduplicate within a 4-hour window
+    const windowIndex = Math.floor(Date.now() / (4 * 3600000));
+    const groupKey = `progress-digest:${boardId}:${recipientId}:w${windowIndex}`;
+
+    // Skip if already sent in this window
+    const existing = await Notification.findOne({ groupKey }).lean();
+    if (existing) return null;
+
     return this.create({
       recipient: recipientId,
       sender: undefined,
@@ -121,7 +136,7 @@ const notificationService = {
       message,
       board: boardId,
       task: undefined,
-      groupKey: `progress-digest:${boardId}:${recipientId}`,
+      groupKey,
       emailHtml
     });
   },

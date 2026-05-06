@@ -22,11 +22,8 @@ const userSchema = new mongoose.Schema({
     taskAssigned: { type: Boolean, default: true },
     taskUpdated: { type: Boolean, default: true },
     statusChanged: { type: Boolean, default: true },
-    /** Notify when a task moves to one of these statuses (empty = none). Omitted in DB = treat as all statuses. */
-    notifyOnStatuses: [{
-      type: String,
-      enum: ['pending', 'in_progress', 'completed', 'blocked', 'cancelled']
-    }],
+    /** Notify when a task moves to one of these statuses. Empty array = all statuses (no filter). Non-empty = whitelist. */
+    notifyOnStatuses: [{ type: String }],
     deadlineReminder: { type: Boolean, default: true },
     mentions: { type: Boolean, default: true },
     /** Board “progress summary” digests (scheduled every 4h when enabled on a board). */

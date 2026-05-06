@@ -189,25 +189,48 @@ router.patch('/me/automations', authenticate, authorize('admin'), async (req, re
   try {
     const { deadlineReminder, progressDigest } = req.body;
     const update = {};
+
+    // Validate webhook URLs — must be https:// and not internal IPs
+    const validateWebhookUrl = (url) => {
+      if (!url || url === '') return true; // blank = disabled
+      try {
+        const parsed = new URL(url);
+        if (!['https:', 'http:'].includes(parsed.protocol)) return false;
+        // Block internal/private IPs
+        const host = parsed.hostname;
+        if (['localhost', '127.0.0.1', '0.0.0.0', '::1'].includes(host)) return false;
+        if (/^(10|172\.(1[6-9]|2\d|3[01])|192\.168)\./.test(host)) return false;
+        return true;
+      } catch { return false; }
+    };
+
+    const VALID_CRON_MODES = ['internal', 'external'];
+
     if (deadlineReminder !== undefined) {
       if (deadlineReminder.enabled !== undefined)
         update['settings.automations.deadlineReminder.enabled'] = !!deadlineReminder.enabled;
-      if (deadlineReminder.cronMode !== undefined)
+      if (deadlineReminder.cronMode !== undefined && VALID_CRON_MODES.includes(deadlineReminder.cronMode))
         update['settings.automations.deadlineReminder.cronMode'] = deadlineReminder.cronMode;
-      if (deadlineReminder.webhookUrl !== undefined)
+      if (deadlineReminder.webhookUrl !== undefined) {
+        if (!validateWebhookUrl(deadlineReminder.webhookUrl))
+          return res.status(400).json({ error: 'Invalid webhook URL for deadline reminder' });
         update['settings.automations.deadlineReminder.webhookUrl'] = deadlineReminder.webhookUrl;
+      }
       if (deadlineReminder.webhookSecret !== undefined)
-        update['settings.automations.deadlineReminder.webhookSecret'] = deadlineReminder.webhookSecret;
+        update['settings.automations.deadlineReminder.webhookSecret'] = String(deadlineReminder.webhookSecret).slice(0, 256);
     }
     if (progressDigest !== undefined) {
       if (progressDigest.enabled !== undefined)
         update['settings.automations.progressDigest.enabled'] = !!progressDigest.enabled;
-      if (progressDigest.cronMode !== undefined)
+      if (progressDigest.cronMode !== undefined && VALID_CRON_MODES.includes(progressDigest.cronMode))
         update['settings.automations.progressDigest.cronMode'] = progressDigest.cronMode;
-      if (progressDigest.webhookUrl !== undefined)
+      if (progressDigest.webhookUrl !== undefined) {
+        if (!validateWebhookUrl(progressDigest.webhookUrl))
+          return res.status(400).json({ error: 'Invalid webhook URL for progress digest' });
         update['settings.automations.progressDigest.webhookUrl'] = progressDigest.webhookUrl;
+      }
       if (progressDigest.webhookSecret !== undefined)
-        update['settings.automations.progressDigest.webhookSecret'] = progressDigest.webhookSecret;
+        update['settings.automations.progressDigest.webhookSecret'] = String(progressDigest.webhookSecret).slice(0, 256);
     }
     if (!Object.keys(update).length) return res.status(400).json({ error: 'No valid fields to update' });
     await Organization.findOneAndUpdate({}, { $set: update });

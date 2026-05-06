@@ -216,6 +216,17 @@ const taskController = {
         const recipientIds = new Set(
           (task.assignedTo || []).map(id => id.toString()).filter(id => id !== actorId)
         );
+
+        // If no assignees, notify board admins so status changes aren't silently lost
+        if (recipientIds.size === 0 && board) {
+          const orgAdmins = await User.find({
+            organization: board.organization,
+            role: 'admin',
+            _id: { $ne: req.user._id }
+          }).select('_id').lean();
+          for (const a of orgAdmins) recipientIds.add(a._id.toString());
+        }
+
         const statusLabel = newStatusValue.replace(/_/g, ' ');
         for (const rid of recipientIds) {
           await notificationService.create({
@@ -455,6 +466,25 @@ const taskController = {
       );
 
       const bid = boardId || req.params.boardId;
+
+      // Notify newly assigned users
+      const bulkTasks = await Task.find({ _id: { $in: taskIds }, board: bid }).select('title').lean();
+      for (const userId of assignTo) {
+        if (userId.toString() === req.user._id.toString()) continue;
+        for (const t of bulkTasks) {
+          await notificationService.create({
+            recipient: userId,
+            sender: req.user._id,
+            type: 'task_assigned',
+            title: 'Task Assigned',
+            message: `You were assigned to "${t.title}"`,
+            board: bid,
+            task: t._id,
+            taskTitle: t.title
+          });
+        }
+      }
+
       socketService.bulkTasksUpdated(bid, taskIds, { assignedTo: assignTo }, req.user);
       res.json({ modified: result.modifiedCount });
     } catch (err) {
@@ -506,6 +536,18 @@ const taskController = {
         }
         if (t.assignedBy && t.assignedBy.toString() !== actorId) {
           recipientIds.add(t.assignedBy);
+        }
+        // Fallback: notify org admins when nobody else is assigned
+        if (recipientIds.size === 0) {
+          const board = await Board.findById(t.board).select('organization').lean();
+          if (board) {
+            const orgAdmins = await User.find({
+              organization: board.organization,
+              role: 'admin',
+              _id: { $ne: req.user._id }
+            }).select('_id').lean();
+            for (const a of orgAdmins) recipientIds.add(a._id.toString());
+          }
         }
         for (const rid of recipientIds) {
           await notificationService.create({
