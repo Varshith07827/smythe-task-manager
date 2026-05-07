@@ -34,10 +34,7 @@ const socketService = {
   },
 
   notifyUser(userId, notification) {
-    getIO().to(`org:${notification.organization}`).emit('notification:new', {
-      ...notification,
-      targetUserId: userId
-    });
+    getIO().to(`user:${userId}`).emit('notification:new', notification);
   },
 
   bulkTasksUpdated(boardId, taskIds, changes, updatedBy) {

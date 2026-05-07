@@ -164,6 +164,7 @@ env_content = f"""# Server
 PORT=5000
 NODE_ENV=production
 CLIENT_URL=https://dev.anydb.pro
+ALLOWED_ORIGINS=https://dev.anydb.pro
 
 # MongoDB
 MONGO_URI=mongodb://localhost:27017/smythe

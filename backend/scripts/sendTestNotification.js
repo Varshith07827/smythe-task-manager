@@ -1,6 +1,6 @@
 /**
  * Send one test email via Noteify (same path as app notifications).
- * Usage: npm run test:email -- recipient@email.com [organizationId]
+ * Usage: npm run test:email -- recipient@email.com
  */
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '../.env') });
@@ -10,16 +10,15 @@ const connectDB = require('../config/db');
 const emailService = require('../services/emailService');
 
 const to = process.argv[2];
-const organizationId = process.argv[3];
 if (!to || !to.includes('@')) {
-  console.error('Usage: npm run test:email -- recipient@email.com [organizationId]');
+  console.error('Usage: npm run test:email -- recipient@email.com');
   process.exit(1);
 }
 
 (async () => {
   await connectDB();
 
-  const branding = await emailService.getAppBranding(organizationId);
+  const branding = await emailService.getAppBranding();
   const appName = branding.siteTitle || branding.appTitle || 'Smythe';
 
   const html = emailService.buildNotificationEmail(

@@ -5,72 +5,79 @@ const notificationService = require('./notificationService');
 
 const CRON_EXPRESSION = process.env.PROGRESS_DIGEST_CRON || '0 */4 * * *';
 
+let isRunning = false;
+
 async function runProgressDigestTick() {
-  const Organization = require('../models/Organization');
+  if (isRunning) {
+    console.log('[ProgressDigest] Skipping — previous run still in progress');
+    return;
+  }
+  isRunning = true;
 
-  // Orgs that have disabled progress digest OR set mode to external
-  const disabledOrgs = await Organization.find({
-    $or: [
-      { 'settings.automations.progressDigest.enabled': false },
-      { 'settings.automations.progressDigest.cronMode': 'external' }
-    ]
-  }).select('_id').lean();
-  const disabledOrgIds = new Set(disabledOrgs.map(o => o._id.toString()));
+  try {
+    const Organization = require('../models/Organization');
 
-  const boards = await Board.find({
-    'progressDigest.enabled': true,
-    archived: { $ne: true }
-  })
-    .select('title organization')
-    .lean();
+    const org = await Organization.findOne().select('settings.automations.progressDigest').lean();
+    if (org?.settings?.automations?.progressDigest?.enabled === false) return;
+    if (org?.settings?.automations?.progressDigest?.cronMode === 'external') return;
 
-  for (const board of boards) {
-    if (disabledOrgIds.has(board.organization?.toString())) continue;
-    const tasks = await Task.find({
-      board: board._id,
-      archived: { $ne: true },
-      assignedTo: { $exists: true, $not: { $size: 0 } }
+    const boards = await Board.find({
+      'progressDigest.enabled': true,
+      archived: { $ne: true }
     })
-      .select('title status dueDate assignedTo')
+      .select('title')
       .lean();
 
-    const byUser = new Map();
-    for (const task of tasks) {
-      for (const uid of task.assignedTo || []) {
-        const id = uid.toString();
-        if (!byUser.has(id)) byUser.set(id, []);
-        byUser.get(id).push({
-          title: task.title,
-          status: task.status,
-          dueDate: task.dueDate
+    for (const board of boards) {
+      const tasks = await Task.find({
+        board: board._id,
+        archived: { $ne: true },
+        assignedTo: { $exists: true, $not: { $size: 0 } }
+      })
+        .select('title status dueDate assignedTo')
+        .lean();
+
+      const byUser = new Map();
+      for (const task of tasks) {
+        for (const uid of task.assignedTo || []) {
+          const id = uid.toString();
+          if (!byUser.has(id)) byUser.set(id, []);
+          byUser.get(id).push({
+            title: task.title,
+            status: task.status,
+            dueDate: task.dueDate
+          });
+        }
+      }
+
+      for (const [userId, userTasks] of byUser) {
+        await notificationService.sendProgressDigest({
+          recipientId: userId,
+          boardId: board._id,
+          boardTitle: board.title,
+          tasks: userTasks
         });
       }
     }
-
-    for (const [userId, userTasks] of byUser) {
-      await notificationService.sendProgressDigest({
-        recipientId: userId,
-        boardId: board._id,
-        boardTitle: board.title,
-        boardOrganizationId: board.organization,
-        tasks: userTasks
-      });
-    }
+  } catch (err) {
+    console.error('[ProgressDigest] Error:', err.message);
+  } finally {
+    isRunning = false;
   }
 }
 
 function start() {
-  if (!cron.validate(CRON_EXPRESSION)) {
-    console.error(`[ProgressDigest] Invalid cron expression: "${CRON_EXPRESSION}" — falling back to 0 */4 * * *`);
-    cron.schedule('0 */4 * * *', () => {
-      runProgressDigestTick().catch((err) => console.error('[ProgressDigest]', err.message));
-    });
-  } else {
-    cron.schedule(CRON_EXPRESSION, () => {
-      runProgressDigestTick().catch((err) => console.error('[ProgressDigest]', err.message));
-    });
-  }
-  console.log(`[ProgressDigest] cron scheduled: ${CRON_EXPRESSION}`);
+  const expression = cron.validate(CRON_EXPRESSION) ? CRON_EXPRESSION : '0 */4 * * *';
+  const task = cron.schedule(expression, () => {
+    runProgressDigestTick().catch((err) => console.error('[ProgressDigest]', err.message));
+  });
+
+  console.log(`[ProgressDigest] cron scheduled: ${expression}`);
+
+  return () => {
+    task.stop();
+    console.log('[ProgressDigest] Stopped');
+  };
 }
 
 module.exports = { start, runProgressDigestTick };

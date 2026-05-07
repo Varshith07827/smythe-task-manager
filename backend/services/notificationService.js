@@ -6,7 +6,6 @@ const notificationService = {
   async create({ recipient, sender, type, title, message, board, task, groupKey, newStatus, emailHtml, taskTitle }) {
     const User = require('../models/User');
 
-    // Skip all notifications for archived projects
     if (board) {
       const Board = require('../models/Board');
       const boardDoc = await Board.findById(board).select('archived').lean();
@@ -36,8 +35,6 @@ const notificationService = {
 
     if (type === 'status_changed' && newStatus) {
       const chosen = user?.notificationPreferences?.notifyOnStatuses;
-      // Empty array or all 5 defaults = no filter (notify on ALL statuses including custom)
-      // Non-empty subset = whitelist only those statuses
       const STANDARD = ['pending', 'in_progress', 'completed', 'blocked', 'cancelled'];
       const isAllDefaults = Array.isArray(chosen) && STANDARD.every(s => chosen.includes(s));
       if (Array.isArray(chosen) && chosen.length > 0 && !isAllDefaults) {
@@ -68,45 +65,34 @@ const notificationService = {
         board,
         task,
         sender,
-        organization: user.organization,
         createdAt: notification.createdAt
       });
     }
 
-    // Send email notification (fire-and-forget)
     if (user?.email && user?.notificationPreferences?.email !== false) {
-      (async () => {
-        try {
-          const branding = await emailService.getAppBranding(user.organization);
-          const appName = branding.appTitle || 'Smythe';
-          const htmlBody = emailHtml || emailService.buildNotificationEmail(title, message, type, branding);
-          const emailSubject = taskTitle ? `${appName} - ${taskTitle}: ${title}` : `${appName} - ${title}`;
-          console.log(`[NotificationService] Sending email to ${user.email} — type: ${type}, subject: ${emailSubject}`);
-          const result = await emailService.send(user.email, emailSubject, htmlBody);
-          if (!result) {
-            console.warn(`[NotificationService] Email send returned null for ${user.email}`);
-          }
-        } catch (emailErr) {
-          console.error(`[NotificationService] Email send failed for ${user.email}:`, emailErr.message);
-        }
-      })();
-    } else {
-      console.log(`[NotificationService] Skipping email — user: ${user?.email || 'no email'}, emailPref: ${user?.notificationPreferences?.email}`);
+      this._sendEmailNotification(user, { title, message, type, taskTitle, emailHtml }).catch(err => {
+        console.error(`[NotificationService] Email failed for ${user.email}:`, err.message);
+      });
     }
 
     return notification;
   },
 
-  /**
-   * Scheduled digest: assigned tasks on a board for one user (in-app + email).
-   */
-  async sendProgressDigest({ recipientId, boardId, boardTitle, boardOrganizationId, tasks }) {
+  async _sendEmailNotification(user, { title, message, type, taskTitle, emailHtml }) {
+    const branding = await emailService.getAppBranding();
+    const appName = branding.appTitle || 'Smythe';
+    const htmlBody = emailHtml || emailService.buildNotificationEmail(title, message, type, branding);
+    const emailSubject = taskTitle ? `${appName} - ${taskTitle}: ${title}` : `${appName} - ${title}`;
+    const result = await emailService.send(user.email, emailSubject, htmlBody);
+    if (!result) {
+      console.warn(`[NotificationService] Email send returned null for ${user.email}`);
+    }
+  },
+
+  async sendProgressDigest({ recipientId, boardId, boardTitle, tasks }) {
     const User = require('../models/User');
     const user = await User.findById(recipientId);
     if (!user) return null;
-    if (boardOrganizationId && user.organization?.toString() !== boardOrganizationId.toString()) {
-      return null;
-    }
     if (!tasks?.length) return null;
 
     const lines = tasks.map((t) => {
@@ -117,14 +103,12 @@ const notificationService = {
       return `• ${t.title} — ${st}${due ? ` — due ${due}` : ''}`;
     });
     const message = [`Board: ${boardTitle}`, '', ...lines].join('\n');
-    const branding = await emailService.getAppBranding(user.organization);
+    const branding = await emailService.getAppBranding();
     const emailHtml = emailService.buildProgressDigestEmail(boardTitle, tasks, branding);
 
-    // Time-windowed groupKey to deduplicate within a 4-hour window
     const windowIndex = Math.floor(Date.now() / (4 * 3600000));
     const groupKey = `progress-digest:${boardId}:${recipientId}:w${windowIndex}`;
 
-    // Skip if already sent in this window
     const existing = await Notification.findOne({ groupKey }).lean();
     if (existing) return null;
 
@@ -150,9 +134,6 @@ const notificationService = {
     return notifications.filter(Boolean);
   },
 
-  /**
-   * Clear unread deadline reminders for a task (when it's completed/cancelled).
-   */
   async clearDeadlineReminders(taskId) {
     return Notification.deleteMany({
       task: taskId,
@@ -184,7 +165,7 @@ const notificationService = {
     return Notification.find({ recipient: userId })
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
-      .limit(limit)
+      .limit(Math.min(limit, 100))
       .populate('sender', 'name avatar')
       .lean();
   }

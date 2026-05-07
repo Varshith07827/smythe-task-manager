@@ -19,14 +19,20 @@ function publicAppUrl() {
   return base.replace(/\/$/, '');
 }
 
-/** Fetch branding from DB or fall back to defaults */
-async function getAppBranding(organizationId) {
+let brandingCache = null;
+let brandingCacheTime = 0;
+const BRANDING_CACHE_TTL = 60 * 1000;
+
+async function getAppBranding() {
+  const now = Date.now();
+  if (brandingCache && now - brandingCacheTime < BRANDING_CACHE_TTL) {
+    return brandingCache;
+  }
+
   try {
     const Organization = require('../models/Organization');
-    const org = organizationId
-      ? await Organization.findById(organizationId).select('branding').lean()
-      : await Organization.findOne().select('branding').lean();
-    return {
+    const org = await Organization.findOne().select('branding').lean();
+    brandingCache = {
       appTitle: org?.branding?.appTitle || 'Smythe',
       tagline: org?.branding?.tagline || '',
       logoUrl: org?.branding?.logoUrl || '',
@@ -37,6 +43,8 @@ async function getAppBranding(organizationId) {
       sidebarColor: org?.branding?.sidebarColor || '#1a1a2e',
       accentColor: org?.branding?.accentColor || '#0a84ff'
     };
+    brandingCacheTime = now;
+    return brandingCache;
   } catch {
     return {
       appTitle: 'Smythe',
@@ -53,9 +61,6 @@ async function getAppBranding(organizationId) {
 }
 
 const emailService = {
-  /**
-   * Send an email notification via Noteify API
-   */
   async send(email, subject, body) {
     const apiKey = process.env.NOTEIFY_API_KEY;
     if (!apiKey) {
@@ -64,6 +69,9 @@ const emailService = {
     }
 
     try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
+
       const response = await fetch(noteifyUrl(), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -72,8 +80,11 @@ const emailService = {
           email,
           subject,
           body
-        })
+        }),
+        signal: controller.signal
       });
+
+      clearTimeout(timeout);
 
       const data = await response.json().catch(() => ({}));
 
@@ -82,7 +93,6 @@ const emailService = {
         return null;
       }
 
-      console.log(`[EmailService] Email sent to ${email}: "${subject}"`, JSON.stringify(data));
       return data;
     } catch (err) {
       console.error('[EmailService] Error sending email:', err.message);
@@ -90,9 +100,6 @@ const emailService = {
     }
   },
 
-  /**
-   * Build a styled HTML email body for task notifications
-   */
   buildNotificationEmail(title, message, type, brandingOverride) {
     const safeTitle = escapeHtml(title);
     const safeMessage = escapeHtml(message);
@@ -118,8 +125,7 @@ const emailService = {
 
     const accentColor = brandingOverride?.accentColor || typeColors[type] || '#0a84ff';
 
-    return `
-<!DOCTYPE html>
+    return `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
@@ -144,7 +150,6 @@ const emailService = {
 </html>`;
   },
 
-  /** HTML list of assigned tasks for scheduled digest emails. */
   buildProgressDigestEmail(boardTitle, tasks, brandingOverride) {
     const safeBoard = escapeHtml(boardTitle);
     const appUrl = publicAppUrl();
@@ -165,8 +170,7 @@ const emailService = {
       return `<tr><td style="padding:10px 0;border-bottom:1px solid rgba(0,0,0,0.06);font-size:14px;color:#1d1d1f;font-weight:550;">${title}</td><td style="padding:10px 0;border-bottom:1px solid rgba(0,0,0,0.06);font-size:13px;color:#6e6e73;text-transform:capitalize;">${st}</td><td style="padding:10px 0;border-bottom:1px solid rgba(0,0,0,0.06);font-size:13px;color:#8e8e93;white-space:nowrap;">${due || '—'}</td></tr>`;
     }).join('');
 
-    return `
-<!DOCTYPE html>
+    return `<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
 <body style="margin:0;padding:0;background:#f5f5f7;font-family:-apple-system,'SF Pro Display','Helvetica Neue',Arial,sans-serif;">
@@ -190,8 +194,12 @@ const emailService = {
 </html>`;
   },
 
-  /** Get branding for email subjects/bodies */
-  getAppBranding
+  getAppBranding,
+
+  _clearBrandingCache() {
+    brandingCache = null;
+    brandingCacheTime = 0;
+  }
 };
 
 module.exports = emailService;

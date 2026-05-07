@@ -38,7 +38,6 @@ const attachmentController = {
       });
 
       await activityService.log({
-        organization: req.user.organization,
         board: task.board,
         task: taskId,
         user: req.user,

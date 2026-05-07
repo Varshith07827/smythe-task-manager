@@ -5,33 +5,32 @@ const activityService = require('../services/activityService');
 const socketService = require('../services/socketService');
 const notificationService = require('../services/notificationService');
 const { buildTaskQuery, buildTaskSort } = require('../utils/queryBuilder');
-const columnValidator = require('../utils/columnValidator');
 const { getEditableFields } = require('../middleware/rbac');
+
+const MAX_BULK = 100;
 
 const taskController = {
   async create(req, res) {
     try {
       const { boardId } = req.params;
       const { title, description, assignedTo, priority, dueDate, startDate, columnValues, parentTask } = req.body;
+      if (!title?.trim()) return res.status(400).json({ error: 'Title is required' });
 
-      // Always include the creator in assignedTo
       const creatorId = req.user._id.toString();
       const assigneeIds = assignedTo ? [...assignedTo] : [];
       if (!assigneeIds.some(id => id.toString() === creatorId)) {
         assigneeIds.unshift(creatorId);
       }
 
-      // Validate assignees: must be active users in the same organization
       if (assigneeIds.length) {
         const validUsers = await User.find({
           _id: { $in: assigneeIds },
-          organization: req.user.organization,
           status: { $in: ['active', 'invited'] }
         }).select('_id').lean();
         const validIds = new Set(validUsers.map(u => u._id.toString()));
         const invalid = assigneeIds.filter(id => !validIds.has(id.toString()));
         if (invalid.length) {
-          return res.status(400).json({ error: 'One or more assignees are not valid active users in this organization' });
+          return res.status(400).json({ error: 'One or more assignees are not valid active users' });
         }
       }
 
@@ -39,8 +38,8 @@ const taskController = {
 
       const task = await Task.create({
         board: boardId,
-        title,
-        description,
+        title: title.trim(),
+        description: description?.slice(0, 10000),
         assignedTo: assigneeIds,
         assignedBy: req.user._id,
         priority,
@@ -60,7 +59,6 @@ const taskController = {
         .populate('assignedTo', 'name avatar')
         .populate('assignedBy', 'name');
 
-      // Notify assigned users (excluding creator)
       if (assigneeIds?.length) {
         for (const userId of assigneeIds) {
           if (userId.toString() !== req.user._id.toString()) {
@@ -69,23 +67,21 @@ const taskController = {
               sender: req.user._id,
               type: 'task_assigned',
               title: 'Task Assigned',
-              message: `You were assigned to "${title}"`,
+              message: `You were assigned to "${title.trim()}"`,
               board: boardId,
               task: task._id,
-              taskTitle: title
+              taskTitle: title.trim()
             });
           }
         }
       }
-      // Note: assigneeIds replaces assignedTo going forward
 
       await activityService.log({
-        organization: req.user.organization,
         board: boardId,
         task: task._id,
         user: req.user,
         action: 'task_created',
-        target: { type: 'task', id: task._id, name: title },
+        target: { type: 'task', id: task._id, name: title.trim() },
         req
       });
 
@@ -100,10 +96,9 @@ const taskController = {
     try {
       const { boardId } = req.params;
       const { page = 1, limit = 50, sortBy, sortDir, ...filters } = req.query;
-      const safeLimit = Math.min(parseInt(limit) || 50, 200); // cap at 200
+      const safeLimit = Math.min(parseInt(limit) || 50, 200);
 
       const query = buildTaskQuery(filters, boardId);
-      // Users only see tasks assigned to them
       if (req.user.role === 'user') {
         query.assignedTo = req.user._id;
       }
@@ -137,7 +132,7 @@ const taskController = {
         .populate('assignedTo', 'name avatar email')
         .populate('assignedBy', 'name')
         .populate('comments.author', 'name avatar')
-        .populate('attachments')
+        .populate('attachments');
 
       if (!task) return res.status(404).json({ error: 'Task not found' });
       res.json(task);
@@ -161,12 +156,10 @@ const taskController = {
         }
       }
 
-      // Track changes
       const changes = activityService.diffChanges(task.toObject(), updates,
         Object.keys(updates));
 
-      const statusChanged =
-        updates.status && updates.status !== task.status;
+      const statusChanged = updates.status && updates.status !== task.status;
       const newStatusValue = statusChanged ? updates.status : null;
 
       if (statusChanged) {
@@ -180,7 +173,6 @@ const taskController = {
         if (updates.status === 'completed') {
           updates.completedAt = new Date();
         }
-        // Clear deadline reminders when task is completed or cancelled
         if (['completed', 'cancelled'].includes(updates.status)) {
           notificationService.clearDeadlineReminders(task._id).catch(() => {});
         }
@@ -200,7 +192,6 @@ const taskController = {
         .populate('assignedBy', 'name');
 
       await activityService.log({
-        organization: req.user.organization,
         board: task.board,
         task: task._id,
         user: req.user,
@@ -212,15 +203,12 @@ const taskController = {
 
       if (newStatusValue) {
         const actorId = req.user._id.toString();
-        // Notify all assignees about status change
         const recipientIds = new Set(
           (task.assignedTo || []).map(id => id.toString()).filter(id => id !== actorId)
         );
 
-        // If no assignees, notify board admins so status changes aren't silently lost
-        if (recipientIds.size === 0 && board) {
+        if (recipientIds.size === 0) {
           const orgAdmins = await User.find({
-            organization: board.organization,
             role: 'admin',
             _id: { $ne: req.user._id }
           }).select('_id').lean();
@@ -273,7 +261,6 @@ const taskController = {
       await Task.deleteOne({ _id: task._id });
 
       await activityService.log({
-        organization: req.user.organization,
         board: boardId,
         task: task._id,
         user: req.user,
@@ -293,6 +280,7 @@ const taskController = {
     try {
       const { taskIds, boardId } = req.body;
       if (!taskIds?.length) return res.status(400).json({ error: 'taskIds are required' });
+      if (taskIds.length > MAX_BULK) return res.status(400).json({ error: `Maximum ${MAX_BULK} tasks per bulk operation` });
 
       const bid = boardId || req.params.boardId;
       const tasks = await Task.find({ _id: { $in: taskIds }, board: bid }).select('_id title').lean();
@@ -300,7 +288,6 @@ const taskController = {
 
       for (const t of tasks) {
         await activityService.log({
-          organization: req.user.organization,
           board: bid,
           task: t._id,
           user: req.user,
@@ -320,12 +307,13 @@ const taskController = {
   async addComment(req, res) {
     try {
       const { text, mentions } = req.body;
+      if (!text?.trim()) return res.status(400).json({ error: 'Comment text is required' });
       const task = await Task.findById(req.params.taskId);
       if (!task) return res.status(404).json({ error: 'Task not found' });
 
       task.comments.push({
         author: req.user._id,
-        text,
+        text: text.trim().slice(0, 10000),
         mentions: mentions || []
       });
 
@@ -336,7 +324,6 @@ const taskController = {
 
       await task.save();
 
-      // Notify assignees about the new comment
       const actorId = req.user._id.toString();
       const assigneeIds = (task.assignedTo || []).map(id => id.toString());
       for (const uid of assigneeIds) {
@@ -352,7 +339,6 @@ const taskController = {
           });
         }
       }
-      // Also notify mentioned users if not already an assignee
       if (mentions?.length) {
         for (const userId of mentions) {
           if (!assigneeIds.includes(userId.toString())) {
@@ -391,7 +377,7 @@ const taskController = {
         return res.status(403).json({ error: 'You can only edit your own comments' });
       }
 
-      comment.text = text.trim();
+      comment.text = text.trim().slice(0, 10000);
       comment.editedAt = new Date();
       await task.save();
 
@@ -437,19 +423,19 @@ const taskController = {
     }
   },
 
-  // Bulk operations
   async bulkAssign(req, res) {
     try {
       const { taskIds, assignTo, boardId } = req.body;
       if (!taskIds?.length || !assignTo?.length) {
         return res.status(400).json({ error: 'taskIds and assignTo are required' });
       }
-      if (taskIds.length > 100) {
-        return res.status(400).json({ error: 'Maximum 100 tasks per bulk operation' });
+      if (taskIds.length > MAX_BULK) {
+        return res.status(400).json({ error: `Maximum ${MAX_BULK} tasks per bulk operation` });
       }
 
+      const bid = boardId || req.params.boardId;
       const result = await Task.updateMany(
-        { _id: { $in: taskIds }, board: boardId || req.params.boardId },
+        { _id: { $in: taskIds }, board: bid },
         {
           $addToSet: { assignedTo: { $each: assignTo } },
           $push: {
@@ -465,9 +451,6 @@ const taskController = {
         }
       );
 
-      const bid = boardId || req.params.boardId;
-
-      // Notify newly assigned users
       const bulkTasks = await Task.find({ _id: { $in: taskIds }, board: bid }).select('title').lean();
       for (const userId of assignTo) {
         if (userId.toString() === req.user._id.toString()) continue;
@@ -498,10 +481,14 @@ const taskController = {
       if (!taskIds?.length || !status) {
         return res.status(400).json({ error: 'taskIds and status are required' });
       }
+      if (taskIds.length > MAX_BULK) {
+        return res.status(400).json({ error: `Maximum ${MAX_BULK} tasks per bulk operation` });
+      }
 
+      const bid = boardId || req.params.boardId;
       const completedAt = status === 'completed' ? new Date() : null;
       const result = await Task.updateMany(
-        { _id: { $in: taskIds }, board: boardId || req.params.boardId },
+        { _id: { $in: taskIds }, board: bid },
         {
           $set: { status, ...(completedAt && { completedAt }) },
           $push: {
@@ -517,37 +504,28 @@ const taskController = {
         }
       );
 
-      const bid = boardId || req.params.boardId;
-
       const tasks = await Task.find({
         _id: { $in: taskIds },
         board: bid,
         archived: { $ne: true }
-      })
-        .select('title assignedTo assignedBy board')
-        .lean();
+      }).select('title assignedTo assignedBy board').lean();
 
       const actorId = req.user._id.toString();
       const statusLabel = status.replace(/_/g, ' ');
       for (const t of tasks) {
         const recipientIds = new Set();
         for (const uid of t.assignedTo || []) {
-          if (uid.toString() !== actorId) recipientIds.add(uid);
+          if (uid.toString() !== actorId) recipientIds.add(uid.toString());
         }
         if (t.assignedBy && t.assignedBy.toString() !== actorId) {
-          recipientIds.add(t.assignedBy);
+          recipientIds.add(t.assignedBy.toString());
         }
-        // Fallback: notify org admins when nobody else is assigned
         if (recipientIds.size === 0) {
-          const board = await Board.findById(t.board).select('organization').lean();
-          if (board) {
-            const orgAdmins = await User.find({
-              organization: board.organization,
-              role: 'admin',
-              _id: { $ne: req.user._id }
-            }).select('_id').lean();
-            for (const a of orgAdmins) recipientIds.add(a._id.toString());
-          }
+          const orgAdmins = await User.find({
+            role: 'admin',
+            _id: { $ne: req.user._id }
+          }).select('_id').lean();
+          for (const a of orgAdmins) recipientIds.add(a._id.toString());
         }
         for (const rid of recipientIds) {
           await notificationService.create({
@@ -563,7 +541,6 @@ const taskController = {
         }
       }
 
-      // Clear deadline reminders for completed/cancelled tasks
       if (['completed', 'cancelled'].includes(status)) {
         for (const tid of taskIds) {
           notificationService.clearDeadlineReminders(tid).catch(() => {});
@@ -580,12 +557,15 @@ const taskController = {
   async bulkArchive(req, res) {
     try {
       const { taskIds, boardId } = req.body;
+      if (!taskIds?.length) return res.status(400).json({ error: 'taskIds are required' });
+      if (taskIds.length > MAX_BULK) return res.status(400).json({ error: `Maximum ${MAX_BULK} tasks per bulk operation` });
+
+      const bid = boardId || req.params.boardId;
       const result = await Task.updateMany(
-        { _id: { $in: taskIds }, board: boardId || req.params.boardId },
+        { _id: { $in: taskIds }, board: bid },
         { $set: { archived: true } }
       );
 
-      const bid = boardId || req.params.boardId;
       socketService.bulkTasksUpdated(bid, taskIds, { archived: true }, req.user);
       res.json({ archived: result.modifiedCount });
     } catch (err) {
@@ -602,7 +582,6 @@ const taskController = {
       if (intervalReminder !== undefined) Object.assign(task.taskNotifications.intervalReminder, intervalReminder);
       if (urgentMode !== undefined) Object.assign(task.taskNotifications.urgentMode, urgentMode);
 
-      // Log to history then save once
       activityService.addTaskHistory(task, {
         changedBy: req.user._id,
         action: 'notification_updated',
@@ -625,7 +604,6 @@ const taskController = {
         .populate('assignedTo', 'name');
       if (!task) return res.status(404).json({ error: 'Task not found' });
 
-      // Notify assignees
       const recipientIds = new Set();
       for (const u of task.assignedTo || []) {
         recipientIds.add(u._id.toString());
@@ -641,18 +619,17 @@ const taskController = {
           sender: req.user._id,
           type: 'reminder',
           title: 'Task Reminder',
-          message: `${req.user.name} sent a reminder for "${task.title}"${text ? `: ${text}` : ''}`,
+          message: `${req.user.name} sent a reminder for "${task.title}"${text ? `: ${text.slice(0, 500)}` : ''}`,
           board: task.board,
           task: task._id
         });
       }
 
-      // Log reminder sent to task history
       task.history.push({
         changedBy: req.user._id,
         action: 'reminder_sent',
         field: 'reminder',
-        newValue: text || 'Manual reminder sent',
+        newValue: text?.slice(0, 500) || 'Manual reminder sent',
         timestamp: new Date()
       });
       if (!task.taskNotifications) task.taskNotifications = {};
@@ -661,7 +638,6 @@ const taskController = {
       await task.save();
 
       await activityService.log({
-        organization: req.user.organization,
         board: task.board,
         task: task._id,
         user: req.user,

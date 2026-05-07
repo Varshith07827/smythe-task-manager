@@ -1,21 +1,20 @@
 const ActivityLog = require('../models/ActivityLog');
 
 const activityService = {
-  async log({ organization, board, task, user, action, target, changes, req }) {
+  async log({ board, task, user, action, target, changes, metadata, req }) {
     try {
       const log = await ActivityLog.create({
-        organization,
         board,
         task,
         user: user._id || user,
         action,
         target,
         changes,
+        metadata,
         ipAddress: req?.ip,
-        userAgent: req?.get('User-Agent')
+        userAgent: req?.get?.('User-Agent')
       });
 
-      // Emit real-time activity event for live log refresh
       if (board) {
         try {
           const socketService = require('./socketService');
@@ -23,7 +22,7 @@ const activityService = {
         } catch {}
       }
     } catch (err) {
-      console.error('Activity log error:', err);
+      console.error('[ActivityService] Log error:', err.message);
     }
   },
 
@@ -67,9 +66,9 @@ const activityService = {
       .lean();
   },
 
-  async getGlobalActivity(organizationId, { page = 1, limit = 25, search, userName, userId, boardId }) {
+  async getGlobalActivity({ page = 1, limit = 25, search, userName, userId, boardId }) {
     const User = require('../models/User');
-    const query = { organization: organizationId };
+    const query = {};
     if (userId) query.user = userId;
     if (boardId) query.board = boardId;
     if (search) {
@@ -78,10 +77,8 @@ const activityService = {
         { 'target.name': { $regex: search, $options: 'i' } }
       ];
     }
-    // Search by user name: find matching user IDs first
     if (userName) {
       const matchingUsers = await User.find({
-        organization: organizationId,
         name: { $regex: userName, $options: 'i' }
       }).select('_id').lean();
       const userIds = matchingUsers.map(u => u._id);

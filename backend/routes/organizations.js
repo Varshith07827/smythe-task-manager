@@ -1,22 +1,3 @@
-/**
- * Organization routes — single-org white-label model.
- *
- * The instance has exactly ONE organization in its DB.
- * All routes use /me to auto-resolve it; no org ID in URLs.
- *
- * Public:
- *   GET  /organizations/branding/public   — login-page branding (no auth)
- *   GET  /organizations/branding/file/:f  — serve uploaded logo/favicon (no auth)
- *
- * Authenticated:
- *   GET   /organizations/me               — get the org
- *   PATCH /organizations/me               — update name/settings (admin only)
- *   POST  /organizations/me/branding/upload
- *   GET   /organizations/me/automations   — automation settings (admin only)
- *   PATCH /organizations/me/automations
- *   POST  /organizations/me/automations/trigger/deadline-reminder
- *   POST  /organizations/me/automations/trigger/progress-digest
- */
 const router = require('express').Router();
 const Organization = require('../models/Organization');
 const { authenticate } = require('../middleware/auth');
@@ -41,24 +22,16 @@ const brandingUpload = multer({
   }
 });
 
-/** Helper: always returns the single org document */
-async function getOrg() {
-  return Organization.findOne().lean();
-}
-async function getOrgFull() {
-  return Organization.findOne();
-}
-
-// ─── Public endpoints (no auth) ────────────────────────────────────────────
-
-// Serve uploaded branding files
 router.get('/branding/file/:filename', (req, res) => {
-  const filePath = path.join(BRANDING_DIR, path.basename(req.params.filename));
+  const filename = path.basename(req.params.filename);
+  if (!/^[a-f0-9-]+\.\w+$/i.test(filename)) {
+    return res.status(400).json({ error: 'Invalid filename' });
+  }
+  const filePath = path.join(BRANDING_DIR, filename);
   if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'File not found' });
   res.sendFile(filePath);
 });
 
-// Login-page branding snapshot
 router.get('/branding/public', async (req, res) => {
   try {
     const org = await Organization.findOne().select('branding settings.allowSignup').lean();
@@ -69,7 +42,7 @@ router.get('/branding/public', async (req, res) => {
       showNameInHeader: true, faviconUrl: '', siteTitle: '', sidebarColor: '#1a1a2e'
     };
     res.json({ ...defaults, ...org?.branding, allowSignup: org?.settings?.allowSignup || false });
-  } catch (err) {
+  } catch {
     res.json({
       appTitle: 'Smythe', tagline: '', logoUrl: '', logoShape: 'rounded',
       accentColor: '#0a84ff', logoSize: 48, showLogoInHeader: true,
@@ -79,8 +52,6 @@ router.get('/branding/public', async (req, res) => {
     });
   }
 });
-
-// ─── Authenticated /me routes ───────────────────────────────────────────────
 
 router.get('/me', authenticate, async (req, res) => {
   try {
@@ -96,14 +67,16 @@ router.patch('/me', authenticate, authorize('admin'), async (req, res) => {
   try {
     const { name, settings, branding } = req.body;
     const update = {};
-    if (name !== undefined) update.name = name;
+    if (name !== undefined) update.name = String(name).trim().slice(0, 200);
     if (settings !== undefined) {
+      const SETTINGS_WHITELIST = ['maxBoards', 'maxMembers', 'allowUserComments', 'allowSignup'];
       for (const [k, v] of Object.entries(settings)) {
-        update[`settings.${k}`] = v;
+        if (SETTINGS_WHITELIST.includes(k)) {
+          update[`settings.${k}`] = v;
+        }
       }
     }
     if (branding !== undefined) {
-      // Whitelist branding fields to prevent arbitrary key injection
       const BRANDING_FIELDS = [
         'appTitle', 'tagline', 'logoUrl', 'logoShape', 'accentColor', 'logoSize',
         'showLogoInHeader', 'showLogoInSidebar', 'headerLogoUrl', 'headerLogoHeight',
@@ -114,17 +87,13 @@ router.patch('/me', authenticate, authorize('admin'), async (req, res) => {
       }
     }
     const org = await Organization.findOneAndUpdate({}, { $set: update }, { new: true });
-    try {
-      const emailService = require('../services/emailService');
-      if (emailService._clearBrandingCache) emailService._clearBrandingCache();
-    } catch { }
+    if (!org) return res.status(404).json({ error: 'Organization not found' });
     res.json(org);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Upload branding image (logo or favicon)
 router.post('/me/branding/upload', authenticate, authorize('admin'), brandingUpload.single('file'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'Only PNG files are allowed' });
@@ -135,7 +104,6 @@ router.post('/me/branding/upload', authenticate, authorize('admin'), brandingUpl
 
     const fileUrl = `/api/organizations/branding/file/${req.file.filename}`;
 
-    // Delete old file if it was a local upload
     const org = await Organization.findOne().select('branding').lean();
     const oldUrl = org?.branding?.[field];
     if (oldUrl?.startsWith('/api/organizations/branding/file/')) {
@@ -146,18 +114,11 @@ router.post('/me/branding/upload', authenticate, authorize('admin'), brandingUpl
 
     await Organization.findOneAndUpdate({}, { $set: { [`branding.${field}`]: fileUrl } });
 
-    try {
-      const emailService = require('../services/emailService');
-      if (emailService._clearBrandingCache) emailService._clearBrandingCache();
-    } catch { }
-
     res.json({ url: fileUrl });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
-
-// ─── Automation config ──────────────────────────────────────────────────────
 
 router.get('/me/automations', authenticate, authorize('admin'), async (req, res) => {
   try {
@@ -169,14 +130,14 @@ router.get('/me/automations', authenticate, authorize('admin'), async (req, res)
         enabled:        automations.deadlineReminder?.enabled !== false,
         cronMode:       automations.deadlineReminder?.cronMode || 'internal',
         webhookUrl:     automations.deadlineReminder?.webhookUrl || '',
-        webhookSecret:  automations.deadlineReminder?.webhookSecret || '',
+        webhookSecret:  automations.deadlineReminder?.webhookSecret ? '***' : '',
         cronExpression: process.env.DEADLINE_REMINDER_CRON || '*/30 * * * *'
       },
       progressDigest: {
         enabled:        automations.progressDigest?.enabled !== false,
         cronMode:       automations.progressDigest?.cronMode || 'internal',
         webhookUrl:     automations.progressDigest?.webhookUrl || '',
-        webhookSecret:  automations.progressDigest?.webhookSecret || '',
+        webhookSecret:  automations.progressDigest?.webhookSecret ? '***' : '',
         cronExpression: process.env.PROGRESS_DIGEST_CRON || '0 */4 * * *'
       }
     });
@@ -185,24 +146,23 @@ router.get('/me/automations', authenticate, authorize('admin'), async (req, res)
   }
 });
 
+function validateWebhookUrl(url) {
+  if (!url || url === '') return true;
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'https:') return false;
+    const host = parsed.hostname;
+    if (['localhost', '127.0.0.1', '0.0.0.0', '::1'].includes(host)) return false;
+    if (/^(10|172\.(1[6-9]|2\d|3[01])|192\.168)\./.test(host)) return false;
+    if (host.endsWith('.local') || host.endsWith('.internal')) return false;
+    return true;
+  } catch { return false; }
+}
+
 router.patch('/me/automations', authenticate, authorize('admin'), async (req, res) => {
   try {
     const { deadlineReminder, progressDigest } = req.body;
     const update = {};
-
-    // Validate webhook URLs — must be https:// and not internal IPs
-    const validateWebhookUrl = (url) => {
-      if (!url || url === '') return true; // blank = disabled
-      try {
-        const parsed = new URL(url);
-        if (!['https:', 'http:'].includes(parsed.protocol)) return false;
-        // Block internal/private IPs
-        const host = parsed.hostname;
-        if (['localhost', '127.0.0.1', '0.0.0.0', '::1'].includes(host)) return false;
-        if (/^(10|172\.(1[6-9]|2\d|3[01])|192\.168)\./.test(host)) return false;
-        return true;
-      } catch { return false; }
-    };
 
     const VALID_CRON_MODES = ['internal', 'external'];
 
@@ -213,7 +173,7 @@ router.patch('/me/automations', authenticate, authorize('admin'), async (req, re
         update['settings.automations.deadlineReminder.cronMode'] = deadlineReminder.cronMode;
       if (deadlineReminder.webhookUrl !== undefined) {
         if (!validateWebhookUrl(deadlineReminder.webhookUrl))
-          return res.status(400).json({ error: 'Invalid webhook URL for deadline reminder' });
+          return res.status(400).json({ error: 'Invalid webhook URL — must be HTTPS and non-internal' });
         update['settings.automations.deadlineReminder.webhookUrl'] = deadlineReminder.webhookUrl;
       }
       if (deadlineReminder.webhookSecret !== undefined)
@@ -226,7 +186,7 @@ router.patch('/me/automations', authenticate, authorize('admin'), async (req, re
         update['settings.automations.progressDigest.cronMode'] = progressDigest.cronMode;
       if (progressDigest.webhookUrl !== undefined) {
         if (!validateWebhookUrl(progressDigest.webhookUrl))
-          return res.status(400).json({ error: 'Invalid webhook URL for progress digest' });
+          return res.status(400).json({ error: 'Invalid webhook URL — must be HTTPS and non-internal' });
         update['settings.automations.progressDigest.webhookUrl'] = progressDigest.webhookUrl;
       }
       if (progressDigest.webhookSecret !== undefined)
@@ -240,7 +200,6 @@ router.patch('/me/automations', authenticate, authorize('admin'), async (req, re
   }
 });
 
-// Manual triggers — for external cron services (cron-job.org, GitHub Actions, Render, etc.)
 router.post('/me/automations/trigger/deadline-reminder', authenticate, authorize('admin'), async (req, res) => {
   try {
     const { runDeadlineCheck } = require('../services/deadlineReminderScheduler');
@@ -260,8 +219,6 @@ router.post('/me/automations/trigger/progress-digest', authenticate, authorize('
     res.status(500).json({ error: err.message });
   }
 });
-
-// ─── Multer error handler ───────────────────────────────────────────────────
 
 router.use((err, req, res, next) => {
   if (err instanceof multer.MulterError) {

@@ -26,5 +26,6 @@ const notificationSchema = new mongoose.Schema({
 notificationSchema.index({ recipient: 1, read: 1, createdAt: -1 });
 notificationSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 notificationSchema.index({ groupKey: 1 }, { sparse: true });
+notificationSchema.index({ task: 1, type: 1 });
 
 module.exports = mongoose.model('Notification', notificationSchema);

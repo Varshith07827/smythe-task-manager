@@ -12,23 +12,20 @@ const checkBoardAccess = (requiredLevel = 'view') => {
       const userId = req.user._id.toString();
       const role = req.user.role;
 
-      // Admin has full access
       if (role === 'admin') {
         req.board = board;
         return next();
       }
 
-      // Board creator always has full access
       if (board.createdBy?.toString() === userId) {
         req.board = board;
         return next();
       }
 
-      // Default permissions if not set
       const perms = board.permissions || {};
-      const visibility = perms.visibility || 'organization';
+      const visibility = perms.visibility || 'all';
 
-      if (visibility === 'organization') {
+      if (visibility === 'all') {
         req.board = board;
         return next();
       }

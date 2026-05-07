@@ -1,13 +1,23 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
-// Debounce lastActive writes: only update DB at most once per 5 minutes per user
 const lastActiveSeen = new Map();
 const LAST_ACTIVE_DEBOUNCE_MS = 5 * 60 * 1000;
 
+const MAX_CACHE_SIZE = 10000;
+function pruneCache() {
+  if (lastActiveSeen.size > MAX_CACHE_SIZE) {
+    const cutoff = Date.now() - LAST_ACTIVE_DEBOUNCE_MS;
+    for (const [k, v] of lastActiveSeen) {
+      if (v < cutoff) lastActiveSeen.delete(k);
+    }
+  }
+}
+
 const authenticate = async (req, res, next) => {
   try {
-    const token = req.header('Authorization')?.replace('Bearer ', '') || req.query.token;
+    const authHeader = req.header('Authorization');
+    const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
     if (!token) return res.status(401).json({ error: 'Authentication required' });
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
@@ -16,30 +26,29 @@ const authenticate = async (req, res, next) => {
       return res.status(401).json({ error: 'Invalid or inactive account' });
     }
 
-    // Auto-fix legacy roles on the fly
-    if (user.role === 'creator' || user.role === 'manager') {
-      user.role = 'admin';
-    }
-
     req.user = user;
     req.token = token;
 
-    // Debounced lastActive — avoid a DB write on every single request
     const uid = user._id.toString();
     const now = Date.now();
     if (!lastActiveSeen.has(uid) || now - lastActiveSeen.get(uid) > LAST_ACTIVE_DEBOUNCE_MS) {
       lastActiveSeen.set(uid, now);
+      pruneCache();
       User.findByIdAndUpdate(uid, { lastActive: new Date() }).catch(() => {});
     }
 
     next();
   } catch (err) {
+    if (err.name === 'TokenExpiredError') {
+      return res.status(401).json({ error: 'Token expired' });
+    }
     res.status(401).json({ error: 'Invalid token' });
   }
 };
 
 const generateToken = (userId) => {
-  return jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: '7d' });
+  const expiresIn = process.env.JWT_EXPIRES_IN || '7d';
+  return jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn });
 };
 
 module.exports = { authenticate, generateToken };

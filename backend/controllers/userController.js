@@ -8,7 +8,7 @@ const activityService = require('../services/activityService');
 const userController = {
   async getOrgMembers(req, res) {
     try {
-      const users = await User.find({ organization: req.user.organization })
+      const users = await User.find({ status: { $ne: 'inactive' } })
         .select('name email role status avatar lastActive notificationPreferences')
         .sort({ name: 1 });
       res.json(users);
@@ -17,11 +17,9 @@ const userController = {
     }
   },
 
-  // Lightweight member list — accessible by all authenticated users (for task assignment)
   async getMembers(req, res) {
     try {
       const users = await User.find({
-        organization: req.user.organization,
         status: { $ne: 'inactive' }
       })
         .select('name email avatar status role')
@@ -39,17 +37,25 @@ const userController = {
         return res.status(400).json({ error: 'Invalid role' });
       }
 
+      if (req.params.id === req.user._id.toString()) {
+        return res.status(400).json({ error: 'Cannot change your own role' });
+      }
+
       const user = await User.findByIdAndUpdate(
         req.params.id,
         { role },
         { new: true }
       ).select('name email role');
 
-      // Update role in org members too
-      await Organization.updateOne(
-        { _id: req.user.organization, 'members.user': req.params.id },
-        { $set: { 'members.$.role': role } }
-      );
+      if (!user) return res.status(404).json({ error: 'User not found' });
+
+      const org = await Organization.findOne();
+      if (org) {
+        await Organization.updateOne(
+          { _id: org._id, 'members.user': req.params.id },
+          { $set: { 'members.$.role': role } }
+        );
+      }
 
       res.json(user);
     } catch (err) {
@@ -64,12 +70,17 @@ const userController = {
         return res.status(400).json({ error: 'Invalid status' });
       }
 
+      if (req.params.id === req.user._id.toString()) {
+        return res.status(400).json({ error: 'Cannot change your own status' });
+      }
+
       const user = await User.findByIdAndUpdate(
         req.params.id,
         { status },
         { new: true }
       ).select('name email role status');
 
+      if (!user) return res.status(404).json({ error: 'User not found' });
       res.json(user);
     } catch (err) {
       res.status(500).json({ error: err.message });
@@ -80,12 +91,14 @@ const userController = {
     try {
       const userId = req.params.id;
 
-      const user = await User.findById(userId).select('name email role status organization');
-      if (!user || user.organization?.toString() !== req.user.organization?.toString()) {
-        return res.status(404).json({ error: 'User not found' });
+      if (userId === req.user._id.toString()) {
+        return res.status(400).json({ error: 'Cannot remove yourself' });
       }
 
-      const boardIds = await Board.find({ organization: req.user.organization }).distinct('_id');
+      const user = await User.findById(userId).select('name email role status');
+      if (!user) return res.status(404).json({ error: 'User not found' });
+
+      const boardIds = await Board.find().distinct('_id');
       const affectedTasks = await Task.find({ board: { $in: boardIds }, assignedTo: userId })
         .select('_id title board')
         .lean();
@@ -98,32 +111,28 @@ const userController = {
         );
       }
 
-      await Organization.findByIdAndUpdate(req.user.organization, {
-        $pull: { members: { user: userId } }
-      });
+      const org = await Organization.findOne();
+      if (org) {
+        await Organization.findByIdAndUpdate(org._id, {
+          $pull: { members: { user: userId } }
+        });
+      }
 
-      await User.findByIdAndUpdate(userId, {
-        status: 'inactive',
-        organization: null
-      });
+      await User.findByIdAndUpdate(userId, { status: 'inactive' });
 
       const taskIds = affectedTasks.map(task => task._id);
       const removalLogs = affectedBoards.length > 0 ? affectedBoards : [null];
       for (const boardId of removalLogs) {
         await activityService.log({
-          organization: req.user.organization,
           board: boardId || undefined,
           user: req.user,
           action: 'user_removed',
           target: { type: 'user', id: user._id, name: user.name },
           changes: [
-            { field: 'status', from: user.status, to: 'inactive' },
-            { field: 'organization', from: user.organization, to: null },
-            { field: 'assignedTasks', from: taskIds, to: [] }
+            { field: 'status', from: user.status, to: 'inactive' }
           ],
           metadata: {
             previousStatus: user.status,
-            previousOrganization: user.organization,
             taskIds,
             boardId: boardId || null
           },
@@ -144,11 +153,10 @@ const userController = {
     try {
       const userId = req.params.id;
 
-      const user = await User.findById(userId).select('name email role status organization');
+      const user = await User.findById(userId).select('name email role status');
       if (!user) return res.status(404).json({ error: 'User not found' });
 
       const removalLog = await ActivityLog.findOne({
-        organization: req.user.organization,
         action: 'user_removed',
         'target.id': userId
       }).sort({ createdAt: -1 });
@@ -157,24 +165,22 @@ const userController = {
         return res.status(404).json({ error: 'No deletion log found for this user' });
       }
 
-      const previousOrganization = removalLog.metadata?.previousOrganization || req.user.organization;
       const previousStatus = removalLog.metadata?.previousStatus || 'active';
       const taskIds = Array.isArray(removalLog.metadata?.taskIds) ? removalLog.metadata.taskIds : [];
 
-      await User.findByIdAndUpdate(userId, {
-        organization: previousOrganization,
-        status: previousStatus
-      });
+      await User.findByIdAndUpdate(userId, { status: previousStatus });
 
-      await Organization.updateOne(
-        { _id: previousOrganization },
-        { $pull: { members: { user: userId } } }
-      );
-
-      await Organization.updateOne(
-        { _id: previousOrganization },
-        { $addToSet: { members: { user: userId, role: user.role } } }
-      );
+      const org = await Organization.findOne();
+      if (org) {
+        await Organization.updateOne(
+          { _id: org._id },
+          { $pull: { members: { user: userId } } }
+        );
+        await Organization.updateOne(
+          { _id: org._id },
+          { $addToSet: { members: { user: userId, role: user.role } } }
+        );
+      }
 
       if (taskIds.length > 0) {
         await Task.updateMany(
@@ -184,14 +190,11 @@ const userController = {
       }
 
       await activityService.log({
-        organization: previousOrganization,
         user: req.user,
         action: 'user_restored',
         target: { type: 'user', id: user._id, name: user.name },
         changes: [
-          { field: 'status', from: 'inactive', to: previousStatus },
-          { field: 'organization', from: null, to: previousOrganization },
-          { field: 'assignedTasks', from: [], to: taskIds }
+          { field: 'status', from: 'inactive', to: previousStatus }
         ],
         metadata: {
           restoredFromLogId: removalLog._id,
@@ -211,9 +214,22 @@ const userController = {
 
   async updateNotificationPreferences(req, res) {
     try {
+      const ALLOWED = new Set([
+        'inApp', 'email', 'taskAssigned', 'taskUpdated', 'statusChanged',
+        'deadlineReminder', 'mentions', 'progressDigest', 'notifyOnStatuses',
+        'deliveryMode', 'quietHoursEnabled', 'quietHoursStart', 'quietHoursEnd',
+        'deadlineReminderHours', 'reminderIntervalHours'
+      ]);
+
       const user = await User.findById(req.user._id);
       if (!user.notificationPreferences) user.notificationPreferences = {};
-      Object.assign(user.notificationPreferences, req.body);
+
+      for (const key of Object.keys(req.body)) {
+        if (ALLOWED.has(key)) {
+          user.notificationPreferences[key] = req.body[key];
+        }
+      }
+
       await user.save({ validateModifiedOnly: true });
       res.json(user.notificationPreferences);
     } catch (err) {
@@ -221,7 +237,6 @@ const userController = {
     }
   },
 
-  /** Admin: merge notification preferences for another org member. */
   async updateMemberNotificationPreferences(req, res) {
     const ALLOWED = new Set([
       'inApp', 'email', 'taskAssigned', 'taskUpdated', 'statusChanged',
@@ -229,9 +244,8 @@ const userController = {
     ]);
     try {
       const target = await User.findById(req.params.id);
-      if (!target || target.organization?.toString() !== req.user.organization?.toString()) {
-        return res.status(404).json({ error: 'User not found' });
-      }
+      if (!target) return res.status(404).json({ error: 'User not found' });
+
       if (!target.notificationPreferences) target.notificationPreferences = {};
       const body = req.body || {};
       for (const key of Object.keys(body)) {
@@ -255,16 +269,17 @@ const userController = {
     try {
       const { name, avatarUrl, email, phone } = req.body;
       const updates = {};
-      if (name?.trim()) updates.name = name.trim();
+      if (name?.trim()) updates.name = name.trim().slice(0, 200);
       if (avatarUrl !== undefined) updates.avatar = avatarUrl;
-      if (phone !== undefined) updates.phone = phone.trim();
+      if (phone !== undefined) updates.phone = (phone || '').trim().slice(0, 30);
       if (email?.trim() && email.trim() !== req.user.email) {
-        const existing = await User.findOne({ email: email.trim().toLowerCase(), _id: { $ne: req.user._id } });
+        const normalizedEmail = email.trim().toLowerCase();
+        const existing = await User.findOne({ email: normalizedEmail, _id: { $ne: req.user._id } });
         if (existing) return res.status(400).json({ error: 'Email is already in use' });
-        updates.email = email.trim().toLowerCase();
+        updates.email = normalizedEmail;
       }
       const user = await User.findByIdAndUpdate(req.user._id, updates, { new: true })
-        .select('name email role status avatar organization phone');
+        .select('name email role status avatar phone');
       res.json(user);
     } catch (err) {
       res.status(500).json({ error: err.message });
@@ -274,11 +289,11 @@ const userController = {
   async updateMemberProfile(req, res) {
     try {
       const { name, email, phone, role } = req.body;
-      const target = await User.findOne({ _id: req.params.id, organization: req.user.organization });
+      const target = await User.findById(req.params.id);
       if (!target) return res.status(404).json({ error: 'User not found' });
       const updates = {};
-      if (name?.trim()) updates.name = name.trim();
-      if (phone !== undefined) updates.phone = (phone || '').trim();
+      if (name?.trim()) updates.name = name.trim().slice(0, 200);
+      if (phone !== undefined) updates.phone = (phone || '').trim().slice(0, 30);
       if (email?.trim()) {
         const lower = email.trim().toLowerCase();
         if (lower !== target.email) {
@@ -291,7 +306,7 @@ const userController = {
         updates.role = role;
       }
       const updated = await User.findByIdAndUpdate(target._id, updates, { new: true })
-        .select('name email role status avatar organization phone createdAt');
+        .select('name email role status avatar phone createdAt');
       res.json(updated);
     } catch (err) {
       res.status(500).json({ error: err.message });
@@ -306,7 +321,6 @@ const userController = {
       const AVATAR_DIR = path.join(__dirname, '..', 'uploads', 'avatars');
       if (!fs.existsSync(AVATAR_DIR)) fs.mkdirSync(AVATAR_DIR, { recursive: true });
 
-      // Delete old avatar if it was a local upload
       const existingUser = await User.findById(req.user._id).select('avatar');
       const oldAvatar = existingUser?.avatar;
       if (oldAvatar?.startsWith('/api/users/avatar/')) {
@@ -316,7 +330,7 @@ const userController = {
 
       const avatarUrl = `/api/users/avatar/${req.file.filename}`;
       const user = await User.findByIdAndUpdate(req.user._id, { avatar: avatarUrl }, { new: true })
-        .select('name email role status avatar organization');
+        .select('name email role status avatar');
       res.json({ url: avatarUrl, user });
     } catch (err) {
       res.status(500).json({ error: err.message });
@@ -328,7 +342,11 @@ const userController = {
       const path = require('path');
       const fs = require('fs');
       const AVATAR_DIR = path.join(__dirname, '..', 'uploads', 'avatars');
-      const filePath = path.join(AVATAR_DIR, path.basename(req.params.filename));
+      const filename = path.basename(req.params.filename);
+      if (!/^[a-f0-9-]+\.\w+$/i.test(filename)) {
+        return res.status(400).json({ error: 'Invalid filename' });
+      }
+      const filePath = path.join(AVATAR_DIR, filename);
       if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Not found' });
       res.sendFile(filePath);
     } catch (err) {
@@ -343,9 +361,7 @@ const userController = {
         return res.status(400).json({ error: 'Subject and details are required' });
       }
 
-      // Find all admin users in the organization
       const admins = await User.find({
-        organization: req.user.organization,
         role: 'admin',
         status: 'active'
       }).select('email name').lean();
@@ -355,23 +371,20 @@ const userController = {
       }
 
       const emailService = require('../services/emailService');
-      const branding = await emailService.getAppBranding(req.user.organization);
+      const branding = await emailService.getAppBranding();
       const appName = branding.appTitle || 'Smythe';
-      const timestamp = new Date().toLocaleString();
+      const timestamp = new Date().toISOString();
 
       const htmlBody = emailService.buildNotificationEmail(
-        `Password Support Request: ${subject}`,
-        `From: ${req.user.name} (${req.user.email})\nDate: ${timestamp}\n\nSubject: ${subject}\n\nDetails:\n${details}`,
+        `Password Support Request: ${subject.trim().slice(0, 200)}`,
+        `From: ${req.user.name} (${req.user.email})\nDate: ${timestamp}\n\nSubject: ${subject.trim().slice(0, 200)}\n\nDetails:\n${details.trim().slice(0, 5000)}`,
         'reminder',
         branding
       );
 
-      // Send email to all admins
       const emailSubject = `${appName} - Password Support Request from ${req.user.name}`;
       for (const admin of admins) {
-        emailService.send(admin.email, emailSubject, htmlBody).catch(err => {
-          console.error(`[PasswordSupport] Failed to email ${admin.email}:`, err.message);
-        });
+        emailService.send(admin.email, emailSubject, htmlBody).catch(() => {});
       }
 
       res.json({ message: 'Password support request sent to administrators' });
@@ -403,15 +416,18 @@ const userController = {
       if (!newPassword || newPassword.length < 8) {
         return res.status(400).json({ error: 'New password must be at least 8 characters' });
       }
+      if (newPassword.length > 128) {
+        return res.status(400).json({ error: 'Password too long' });
+      }
+      if (!currentPassword) {
+        return res.status(400).json({ error: 'Current password is required' });
+      }
 
       const user = await User.findById(req.user._id).select('+password');
       if (!user) return res.status(404).json({ error: 'User not found' });
 
-      // If user has a password set, verify current password
-      if (currentPassword) {
-        const isMatch = await user.comparePassword(currentPassword);
-        if (!isMatch) return res.status(401).json({ error: 'Current password is incorrect' });
-      }
+      const isMatch = await user.comparePassword(currentPassword);
+      if (!isMatch) return res.status(401).json({ error: 'Current password is incorrect' });
 
       user.password = newPassword;
       await user.save({ validateModifiedOnly: true });

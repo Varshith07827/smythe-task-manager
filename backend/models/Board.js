@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 const columnSchema = new mongoose.Schema({
-  name: { type: String, required: true },
+  name: { type: String, required: true, maxlength: 100 },
   type: {
     type: String,
     enum: ['text', 'number', 'dropdown', 'date', 'checkbox', 'user', 'url', 'email', 'tag'],
@@ -17,18 +17,16 @@ const columnSchema = new mongoose.Schema({
 }, { _id: true });
 
 const boardSchema = new mongoose.Schema({
-  title: { type: String, required: true, trim: true },
-  description: { type: String },
-  organization: { type: mongoose.Schema.Types.ObjectId, ref: 'Organization', required: true },
+  title: { type: String, required: true, trim: true, maxlength: 200 },
+  description: { type: String, maxlength: 5000 },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   columns: [columnSchema],
   permissions: {
     visibility: {
       type: String,
-      enum: ['organization', 'restricted'],
-      default: 'organization'
+      enum: ['all', 'restricted'],
+      default: 'all'
     },
-    allowedManagers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     allowedUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     userCanComment: { type: Boolean, default: true },
     userCanChangeStatus: { type: Boolean, default: true },
@@ -36,7 +34,6 @@ const boardSchema = new mongoose.Schema({
   },
   defaultSort: { field: String, direction: { type: String, enum: ['asc', 'desc'] } },
   defaultFilter: mongoose.Schema.Types.Mixed,
-  /** Every 4 hours, email + in-app digest of assigned tasks to each assignee (server cron). */
   progressDigest: {
     enabled: { type: Boolean, default: false },
     intervalHours: { type: Number, default: 4 }
@@ -55,7 +52,7 @@ const boardSchema = new mongoose.Schema({
   archived: { type: Boolean, default: false }
 }, { timestamps: true });
 
-boardSchema.index({ organization: 1, archived: 1 });
+boardSchema.index({ archived: 1, createdAt: -1 });
 boardSchema.index({ createdBy: 1 });
 
 module.exports = mongoose.model('Board', boardSchema);

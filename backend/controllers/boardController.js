@@ -8,22 +8,21 @@ const boardController = {
   async create(req, res) {
     try {
       const { title, description, columns, color } = req.body;
+      if (!title?.trim()) return res.status(400).json({ error: 'Title is required' });
 
       const board = await Board.create({
-        title,
-        description,
+        title: title.trim(),
+        description: description?.slice(0, 5000),
         color: color || '',
-        organization: req.user.organization,
         createdBy: req.user._id,
         columns: columns || []
       });
 
       await activityService.log({
-        organization: req.user.organization,
         board: board._id,
         user: req.user,
         action: 'board_created',
-        target: { type: 'board', id: board._id, name: title },
+        target: { type: 'board', id: board._id, name: title.trim() },
         req
       });
 
@@ -36,24 +35,21 @@ const boardController = {
   async getAll(req, res) {
     try {
       const userId = req.user._id;
-      const orgId = req.user.organization;
       const role = req.user.role;
 
       let query;
       if (role === 'admin') {
-        query = { organization: orgId, archived: { $ne: true } };
+        query = { archived: { $ne: true } };
       } else {
-        // Regular users: boards they created OR have assigned tasks on
         const [assignedBoardIds, createdBoardIds] = await Promise.all([
           Task.distinct('board', { assignedTo: userId, archived: { $ne: true } }),
-          Board.distinct('_id', { createdBy: userId, organization: orgId, archived: { $ne: true } })
+          Board.distinct('_id', { createdBy: userId, archived: { $ne: true } })
         ]);
         const allIds = [...new Set([
           ...assignedBoardIds.map(id => id.toString()),
           ...createdBoardIds.map(id => id.toString())
         ])];
         query = {
-          organization: orgId,
           archived: { $ne: true },
           _id: { $in: allIds }
         };
@@ -64,7 +60,6 @@ const boardController = {
         .sort({ createdAt: -1 })
         .lean();
 
-      // Attach task counts
       const boardIds = boards.map(b => b._id);
       const taskCounts = await Task.aggregate([
         { $match: { board: { $in: boardIds }, archived: { $ne: true } } },
@@ -107,7 +102,6 @@ const boardController = {
       if (!board) return res.status(404).json({ error: 'Board not found' });
 
       socketService.boardUpdated(board._id, $set, req.user);
-
       res.json(board);
     } catch (err) {
       res.status(500).json({ error: err.message });
@@ -116,7 +110,7 @@ const boardController = {
 
   async archive(req, res) {
     try {
-      const board = await Board.findById(req.params.boardId).select('organization createdBy archived');
+      const board = await Board.findById(req.params.boardId).select('createdBy archived');
       if (!board) return res.status(404).json({ error: 'Board not found' });
       const isAdmin = req.user.role === 'admin';
       const isOwner = board.createdBy?.toString() === req.user._id.toString();
@@ -130,8 +124,7 @@ const boardController = {
 
   async getArchived(req, res) {
     try {
-      const orgId = req.user.organization;
-      const boards = await Board.find({ organization: orgId, archived: true })
+      const boards = await Board.find({ archived: true })
         .select('title description color createdAt columns permissions.visibility')
         .sort({ createdAt: -1 })
         .lean();
@@ -163,7 +156,6 @@ const boardController = {
       const isAdmin = req.user.role === 'admin';
       const isOwner = board.createdBy?.toString() === req.user._id.toString();
       if (!isAdmin && !isOwner) return res.status(403).json({ error: 'Only the board creator or an admin can delete this project' });
-      const Task = require('../models/Task');
       await Task.deleteMany({ board: board._id });
       await Board.findByIdAndDelete(board._id);
       res.json({ message: 'Board permanently deleted' });
@@ -172,13 +164,14 @@ const boardController = {
     }
   },
 
-  // Column management
   async addColumn(req, res) {
     try {
       const board = await Board.findById(req.params.boardId);
+      if (!board) return res.status(404).json({ error: 'Board not found' });
       const { name, type, options, required, defaultValue } = req.body;
+      if (!name?.trim()) return res.status(400).json({ error: 'Column name is required' });
       board.columns.push({
-        name, type, options, required, defaultValue,
+        name: name.trim(), type, options, required, defaultValue,
         order: board.columns.length
       });
       await board.save();
@@ -193,6 +186,7 @@ const boardController = {
   async updateColumn(req, res) {
     try {
       const board = await Board.findById(req.params.boardId);
+      if (!board) return res.status(404).json({ error: 'Board not found' });
       const col = board.columns.id(req.params.colId);
       if (!col) return res.status(404).json({ error: 'Column not found' });
 
@@ -209,6 +203,7 @@ const boardController = {
   async removeColumn(req, res) {
     try {
       const board = await Board.findById(req.params.boardId);
+      if (!board) return res.status(404).json({ error: 'Board not found' });
       board.columns.pull({ _id: req.params.colId });
       await board.save();
 
@@ -224,7 +219,7 @@ const boardController = {
       const board = await Board.findById(req.params.boardId);
       if (!board) return res.status(404).json({ error: 'Board not found' });
 
-      const { columns } = req.body; // array of { name, type, options, required, defaultValue, visible }
+      const { columns } = req.body;
       if (!Array.isArray(columns)) return res.status(400).json({ error: 'columns must be an array' });
 
       board.columns = columns.map((col, idx) => ({
@@ -248,12 +243,13 @@ const boardController = {
   async reorderColumns(req, res) {
     try {
       const board = await Board.findById(req.params.boardId);
-      const { columnOrder } = req.body; // array of column _ids in new order
-      const reordered = columnOrder.map((id, idx) => {
+      if (!board) return res.status(404).json({ error: 'Board not found' });
+      const { columnOrder } = req.body;
+      if (!Array.isArray(columnOrder)) return res.status(400).json({ error: 'columnOrder must be an array' });
+      columnOrder.forEach((id, idx) => {
         const col = board.columns.id(id);
         if (col) col.order = idx;
-        return col;
-      }).filter(Boolean);
+      });
 
       await board.save();
       socketService.boardUpdated(board._id, { columns: board.columns }, req.user);
@@ -263,10 +259,9 @@ const boardController = {
     }
   },
 
-  // Permissions
   async updatePermissions(req, res) {
     try {
-      const { visibility, allowedManagers, allowedUsers, userCanComment,
+      const { visibility, allowedUsers, userCanComment,
               userCanChangeStatus, userEditableColumns } = req.body;
 
       if (req.user.role !== 'admin') {
@@ -276,13 +271,14 @@ const boardController = {
       const board = await Board.findByIdAndUpdate(req.params.boardId, {
         $set: {
           'permissions.visibility': visibility,
-          'permissions.allowedManagers': allowedManagers,
           'permissions.allowedUsers': allowedUsers,
           'permissions.userCanComment': userCanComment,
           'permissions.userCanChangeStatus': userCanChangeStatus,
           'permissions.userEditableColumns': userEditableColumns
         }
       }, { new: true });
+
+      if (!board) return res.status(404).json({ error: 'Board not found' });
 
       if (allowedUsers?.length) {
         await notificationService.notifyMany(allowedUsers, {
@@ -306,7 +302,7 @@ const boardController = {
       const { page = 1, limit = 50 } = req.query;
       const activity = await activityService.getBoardActivity(
         req.params.boardId,
-        { page: parseInt(page), limit: parseInt(limit) }
+        { page: parseInt(page), limit: Math.min(parseInt(limit) || 50, 100) }
       );
       res.json(activity);
     } catch (err) {
@@ -314,13 +310,13 @@ const boardController = {
     }
   },
 
-  /** Who receives scheduled assignee summaries + current schedule flags (view access). */
   async getNotificationSchedule(req, res) {
     try {
       const { boardId } = req.params;
       const board = await Board.findById(boardId).select('title progressDigest').lean();
       if (!board) return res.status(404).json({ error: 'Board not found' });
 
+      const User = require('../models/User');
       const tasks = await Task.find({
         board: boardId,
         archived: { $ne: true },
@@ -378,7 +374,6 @@ const boardController = {
     }
   },
 
-  /** Send an on-demand progress report for a board to an email address. */
   async sendProgressReport(req, res) {
     try {
       const { email } = req.body;
@@ -397,7 +392,7 @@ const boardController = {
         .lean();
 
       const emailService = require('../services/emailService');
-      const branding = await emailService.getAppBranding(req.user.organization);
+      const branding = await emailService.getAppBranding();
       const appName = branding.appTitle || 'Smythe';
       const htmlBody = emailService.buildProgressDigestEmail(board.title, tasks, branding);
       const subject = `${appName} - ${board.title} progress report`;
