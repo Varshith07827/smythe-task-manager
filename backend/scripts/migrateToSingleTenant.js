@@ -10,6 +10,7 @@
  *  3. Changes Board visibility from 'organization' to 'all'
  *  4. Removes `organization` from all ActivityLog documents
  *  5. Removes `creator` from Organization document (if present)
+ *  6. Normalizes legacy user roles (creator/manager → admin)
  */
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '../.env') });
@@ -57,6 +58,19 @@ async function migrate() {
     { $unset: { creator: '' } }
   );
   results.orgsCreatorRemoved = orgs.modifiedCount;
+
+  const legacyRoles = await db.collection('users').updateMany(
+    { role: { $in: ['creator', 'manager'] } },
+    { $set: { role: 'admin' } }
+  );
+  results.legacyRolesNormalized = legacyRoles.modifiedCount;
+
+  const orgMemberRoles = await db.collection('organizations').updateMany(
+    { 'members.role': { $in: ['creator', 'manager'] } },
+    { $set: { 'members.$[elem].role': 'admin' } },
+    { arrayFilters: [{ 'elem.role': { $in: ['creator', 'manager'] } }] }
+  );
+  results.orgMemberRolesNormalized = orgMemberRoles.modifiedCount;
 
   console.log('\n--- Migration complete ---');
   for (const [key, count] of Object.entries(results)) {

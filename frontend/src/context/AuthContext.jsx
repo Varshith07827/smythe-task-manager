@@ -7,13 +7,7 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
     const saved = localStorage.getItem('user');
     if (!saved) return null;
-    const parsed = JSON.parse(saved);
-    // Normalize legacy roles from before role simplification
-    if (parsed && (parsed.role === 'creator' || parsed.role === 'manager')) {
-      parsed.role = 'admin';
-      localStorage.setItem('user', JSON.stringify(parsed));
-    }
-    return parsed;
+    return JSON.parse(saved);
   });
   const [token, setToken] = useState(() => localStorage.getItem('token'));
   const [loading, setLoading] = useState(true);

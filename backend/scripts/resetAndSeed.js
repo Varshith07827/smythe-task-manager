@@ -104,7 +104,7 @@ async function main() {
   const [morgan, priya, uma, jake, lin, sarah] = users;
   const allActive = [adminUser, morgan, priya, uma, jake, lin];
 
-  console.log(`Created ${users.length + 1} users (1 admin creator, 2 admins, 3 active users, 1 invited)`);
+  console.log(`Created ${users.length + 1} users (3 admins, 3 active users, 1 invited)`);
 
   /* ── 2. Boards ───────────────────────────────────────────────────── */
 
