@@ -1,4 +1,5 @@
 const ActivityLog = require('../models/ActivityLog');
+const log = require('../utils/logger');
 
 const activityService = {
   async log({ board, task, user, action, target, changes, metadata, req }) {
@@ -22,7 +23,7 @@ const activityService = {
         } catch {}
       }
     } catch (err) {
-      console.error('[ActivityService] Log error:', err.message);
+      log.error('ActivityService', `Log error: ${err.message}`);
     }
   },
 

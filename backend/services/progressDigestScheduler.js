@@ -2,6 +2,7 @@ const cron = require('node-cron');
 const Board = require('../models/Board');
 const Task = require('../models/Task');
 const notificationService = require('./notificationService');
+const log = require('../utils/logger');
 
 const CRON_EXPRESSION = process.env.PROGRESS_DIGEST_CRON || '0 */4 * * *';
 
@@ -9,7 +10,7 @@ let isRunning = false;
 
 async function runProgressDigestTick() {
   if (isRunning) {
-    console.log('[ProgressDigest] Skipping — previous run still in progress');
+    log.info('ProgressDigest', 'Skipping — previous run still in progress');
     return;
   }
   isRunning = true;
@@ -60,7 +61,7 @@ async function runProgressDigestTick() {
       }
     }
   } catch (err) {
-    console.error('[ProgressDigest] Error:', err.message);
+    log.error('ProgressDigest', err.message);
   } finally {
     isRunning = false;
   }
@@ -69,14 +70,14 @@ async function runProgressDigestTick() {
 function start() {
   const expression = cron.validate(CRON_EXPRESSION) ? CRON_EXPRESSION : '0 */4 * * *';
   const task = cron.schedule(expression, () => {
-    runProgressDigestTick().catch((err) => console.error('[ProgressDigest]', err.message));
+    runProgressDigestTick().catch((err) => log.error('ProgressDigest', err.message));
   });
 
-  console.log(`[ProgressDigest] cron scheduled: ${expression}`);
+  log.info('ProgressDigest', `cron scheduled: ${expression}`);
 
   return () => {
     task.stop();
-    console.log('[ProgressDigest] Stopped');
+    log.info('ProgressDigest', 'Stopped');
   };
 }
 

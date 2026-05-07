@@ -1,9 +1,10 @@
 const mongoose = require('mongoose');
+const log = require('../utils/logger');
 
 const connectDB = async () => {
   const uri = process.env.MONGO_URI;
   if (!uri) {
-    console.error('MONGO_URI environment variable is required');
+    log.error('DB', 'MONGO_URI environment variable is required');
     process.exit(1);
   }
 
@@ -13,9 +14,9 @@ const connectDB = async () => {
       serverSelectionTimeoutMS: 5000,
       socketTimeoutMS: 45000
     });
-    console.log('MongoDB connected');
+    log.info('DB', 'MongoDB connected');
   } catch (err) {
-    console.error('MongoDB connection error:', err.message);
+    log.error('DB', 'MongoDB connection error', err.message);
     process.exit(1);
   }
 };

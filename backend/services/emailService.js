@@ -1,3 +1,4 @@
+const log = require('../utils/logger');
 const DEFAULT_NOTEIFY_URL = 'https://noteify.org/email/';
 
 function escapeHtml(str) {
@@ -64,7 +65,7 @@ const emailService = {
   async send(email, subject, body) {
     const apiKey = process.env.NOTEIFY_API_KEY;
     if (!apiKey) {
-      console.warn('[EmailService] NOTEIFY_API_KEY not set, skipping email');
+      log.warn('EmailService', 'NOTEIFY_API_KEY not set, skipping email');
       return null;
     }
 
@@ -89,13 +90,13 @@ const emailService = {
       const data = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        console.error('[EmailService] Failed to send email:', response.status, data);
+        log.error('EmailService', `Failed to send email: ${response.status}`, data);
         return null;
       }
 
       return data;
     } catch (err) {
-      console.error('[EmailService] Error sending email:', err.message);
+      log.error('EmailService', `Error sending email: ${err.message}`);
       return null;
     }
   },
@@ -194,12 +195,7 @@ const emailService = {
 </html>`;
   },
 
-  getAppBranding,
-
-  _clearBrandingCache() {
-    brandingCache = null;
-    brandingCacheTime = 0;
-  }
+  getAppBranding
 };
 
 module.exports = emailService;

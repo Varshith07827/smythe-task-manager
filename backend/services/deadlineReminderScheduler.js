@@ -3,6 +3,7 @@ const Task = require('../models/Task');
 const User = require('../models/User');
 const Notification = require('../models/Notification');
 const notificationService = require('./notificationService');
+const log = require('../utils/logger');
 
 const CRON_EXPRESSION = process.env.DEADLINE_REMINDER_CRON || '*/30 * * * *';
 
@@ -28,7 +29,7 @@ function isQuietHours(user) {
 
 async function runDeadlineCheck() {
   if (isRunning) {
-    console.log('[DeadlineReminder] Skipping — previous run still in progress');
+    log.info('DeadlineReminder', 'Skipping — previous run still in progress');
     return;
   }
   isRunning = true;
@@ -155,10 +156,10 @@ async function runDeadlineCheck() {
     }
 
     if (sentCount > 0) {
-      console.log(`[DeadlineReminder] Sent ${sentCount} reminder(s)`);
+      log.info('DeadlineReminder', `Sent ${sentCount} reminder(s)`);
     }
   } catch (err) {
-    console.error('[DeadlineReminder] Error:', err.message);
+    log.error('DeadlineReminder', err.message);
   } finally {
     isRunning = false;
   }
@@ -167,18 +168,18 @@ async function runDeadlineCheck() {
 function start() {
   const expression = cron.validate(CRON_EXPRESSION) ? CRON_EXPRESSION : '*/30 * * * *';
   const task = cron.schedule(expression, () => {
-    runDeadlineCheck().catch((err) => console.error('[DeadlineReminder]', err.message));
+    runDeadlineCheck().catch((err) => log.error('DeadlineReminder', err.message));
   });
 
   setTimeout(() => {
-    runDeadlineCheck().catch((err) => console.error('[DeadlineReminder] initial run:', err.message));
+    runDeadlineCheck().catch((err) => log.error('DeadlineReminder', `initial run: ${err.message}`));
   }, 10000);
 
-  console.log(`[DeadlineReminder] cron scheduled: ${expression}`);
+  log.info('DeadlineReminder', `cron scheduled: ${expression}`);
 
   return () => {
     task.stop();
-    console.log('[DeadlineReminder] Stopped');
+    log.info('DeadlineReminder', 'Stopped');
   };
 }
 

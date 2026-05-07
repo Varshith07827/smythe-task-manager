@@ -9,6 +9,7 @@ require('dotenv').config();
 const connectDB = require('./config/db');
 const { initSocket } = require('./config/socket');
 const { AppError } = require('./utils/errors');
+const log = require('./utils/logger');
 
 const app = express();
 const server = http.createServer(app);
@@ -86,7 +87,17 @@ app.use('/api/activity', require('./routes/activity'));
 app.use('/api', require('./routes/attachments'));
 
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date() });
+  const mongoose = require('mongoose');
+  const dbState = mongoose.connection.readyState;
+  const dbStatus = { 0: 'disconnected', 1: 'connected', 2: 'connecting', 3: 'disconnecting' };
+  const healthy = dbState === 1;
+  res.status(healthy ? 200 : 503).json({
+    status: healthy ? 'ok' : 'degraded',
+    timestamp: new Date().toISOString(),
+    uptime: Math.floor(process.uptime()),
+    db: dbStatus[dbState] || 'unknown',
+    schedulers: schedulerCleanups.length
+  });
 });
 
 app.use((err, req, res, _next) => {
@@ -96,12 +107,12 @@ app.use((err, req, res, _next) => {
       ...(err.details ? { details: err.details } : {})
     });
   }
-  console.error('[UnhandledError]', err.stack || err.message);
+  log.error('UnhandledError', err.stack || err.message);
   res.status(500).json({ error: isProduction ? 'Internal server error' : err.message });
 });
 
 process.on('unhandledRejection', (reason) => {
-  console.error('[UnhandledRejection]', reason);
+  log.error('UnhandledRejection', String(reason));
 });
 
 const PORT = process.env.PORT || 5000;
@@ -110,21 +121,21 @@ let schedulerCleanups = [];
 
 connectDB().then(() => {
   server.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on port ${PORT} [${process.env.NODE_ENV || 'development'}]`);
+    log.info('Server', `running on port ${PORT} [${process.env.NODE_ENV || 'development'}]`);
     schedulerCleanups.push(require('./services/progressDigestScheduler').start());
     schedulerCleanups.push(require('./services/deadlineReminderScheduler').start());
   });
 });
 
 function gracefulShutdown(signal) {
-  console.log(`\n[${signal}] Shutting down gracefully...`);
+  log.info('Server', `${signal} received, shutting down gracefully...`);
   for (const cleanup of schedulerCleanups) {
     if (typeof cleanup === 'function') cleanup();
   }
   server.close(() => {
     const mongoose = require('mongoose');
     mongoose.connection.close(false).then(() => {
-      console.log('Database connection closed');
+      log.info('Server', 'Database connection closed');
       process.exit(0);
     });
   });

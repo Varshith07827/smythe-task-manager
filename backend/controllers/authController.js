@@ -3,6 +3,7 @@ const Organization = require('../models/Organization');
 const { generateToken } = require('../middleware/auth');
 const crypto = require('crypto');
 const emailService = require('../services/emailService');
+const log = require('../utils/logger');
 
 const otpStore = new Map();
 const pendingRegistrations = new Map();
@@ -67,7 +68,7 @@ const authController = {
 
       res.json({ message: 'OTP sent to your email' });
     } catch (err) {
-      console.error('[Auth] requestOtp error:', err.message);
+      log.error('Auth', `requestOtp: ${err.message}`);
       res.status(500).json({ error: 'Failed to send OTP' });
     }
   },
@@ -112,7 +113,7 @@ const authController = {
         user: { _id: user._id, name: user.name, email: user.email, role: user.role }
       });
     } catch (err) {
-      console.error('[Auth] verifyOtp error:', err.message);
+      log.error('Auth', `verifyOtp: ${err.message}`);
       res.status(500).json({ error: 'Verification failed' });
     }
   },
@@ -151,7 +152,7 @@ const authController = {
 
       res.json({ message: 'Confirmation code sent to your email' });
     } catch (err) {
-      console.error('[Auth] registerRequest error:', err.message);
+      log.error('Auth', `registerRequest: ${err.message}`);
       res.status(500).json({ error: 'Registration failed' });
     }
   },
@@ -246,7 +247,7 @@ const authController = {
         message: 'Account created! Check your email for login credentials.'
       });
     } catch (err) {
-      console.error('[Auth] registerConfirm error:', err.message);
+      log.error('Auth', `registerConfirm: ${err.message}`);
       res.status(500).json({ error: 'Registration failed' });
     }
   },
@@ -276,7 +277,7 @@ const authController = {
         user: { _id: user._id, name: user.name, email: user.email, role: user.role }
       });
     } catch (err) {
-      console.error('[Auth] login error:', err.message);
+      log.error('Auth', `login: ${err.message}`);
       res.status(500).json({ error: 'Login failed' });
     }
   },
@@ -344,7 +345,7 @@ const authController = {
         branding
       );
       emailService.send(normalizedEmail, `${appName} - You're invited!`, html).catch(err => {
-        console.error('[Invite] Failed to send invite email:', err.message);
+        log.error('Auth', `invite email failed: ${err.message}`);
       });
 
       res.status(201).json({
@@ -353,7 +354,7 @@ const authController = {
         tempPassword
       });
     } catch (err) {
-      console.error('[Auth] invite error:', err.message);
+      log.error('Auth', `invite: ${err.message}`);
       res.status(500).json({ error: 'Invite failed' });
     }
   },
@@ -393,7 +394,7 @@ const authController = {
 
       res.json({ message: 'Support request sent to administrators' });
     } catch (err) {
-      console.error('[Auth] submitSupport error:', err.message);
+      log.error('Auth', `submitSupport: ${err.message}`);
       res.status(500).json({ error: 'Failed to submit support request' });
     }
   },

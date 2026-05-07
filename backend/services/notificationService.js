@@ -1,6 +1,7 @@
 const Notification = require('../models/Notification');
 const socketService = require('./socketService');
 const emailService = require('./emailService');
+const log = require('../utils/logger');
 
 const notificationService = {
   async create({ recipient, sender, type, title, message, board, task, groupKey, newStatus, emailHtml, taskTitle }) {
@@ -14,7 +15,7 @@ const notificationService = {
 
     const user = await User.findById(recipient);
     if (!user) {
-      console.warn(`[NotificationService] Recipient ${recipient} not found — skipping`);
+      log.warn('NotificationService', `Recipient ${recipient} not found — skipping`);
       return null;
     }
 
@@ -71,7 +72,7 @@ const notificationService = {
 
     if (user?.email && user?.notificationPreferences?.email !== false) {
       this._sendEmailNotification(user, { title, message, type, taskTitle, emailHtml }).catch(err => {
-        console.error(`[NotificationService] Email failed for ${user.email}:`, err.message);
+        log.error('NotificationService', `Email failed for ${user.email}: ${err.message}`);
       });
     }
 
@@ -85,7 +86,7 @@ const notificationService = {
     const emailSubject = taskTitle ? `${appName} - ${taskTitle}: ${title}` : `${appName} - ${title}`;
     const result = await emailService.send(user.email, emailSubject, htmlBody);
     if (!result) {
-      console.warn(`[NotificationService] Email send returned null for ${user.email}`);
+      log.warn('NotificationService', `Email send returned null for ${user.email}`);
     }
   },
 
