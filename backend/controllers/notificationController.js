@@ -6,7 +6,7 @@ const notificationController = {
       const { page = 1, limit = 20 } = req.query;
       const notifications = await notificationService.getUserNotifications(
         req.user._id,
-        { page: parseInt(page), limit: parseInt(limit) }
+        { page: parseInt(page) || 1, limit: Math.min(parseInt(limit) || 20, 100) }
       );
       res.json(notifications);
     } catch (err) {
