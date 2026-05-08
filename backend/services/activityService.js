@@ -73,9 +73,10 @@ const activityService = {
     if (userId) query.user = userId;
     if (boardId) query.board = boardId;
     if (search) {
+      const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').slice(0, 200);
       query.$or = [
-        { action: { $regex: search, $options: 'i' } },
-        { 'target.name': { $regex: search, $options: 'i' } }
+        { action: { $regex: escaped, $options: 'i' } },
+        { 'target.name': { $regex: escaped, $options: 'i' } }
       ];
     }
     if (userName) {

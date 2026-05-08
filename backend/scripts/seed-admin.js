@@ -28,7 +28,9 @@ async function seedAdmin() {
       });
     }
 
-    const adminEmail = 'admin@smythe.local';
+    const adminEmail = process.env.SMYTHE_ADMIN_EMAIL || 'admin@smythe.local';
+    const adminPassword = process.env.SMYTHE_SEED_PASSWORD || 'SmytheDemo123!';
+
     let admin = await User.findOne({ email: adminEmail });
     if (admin) {
       console.log(`Admin user ${adminEmail} already exists.`);
@@ -37,7 +39,7 @@ async function seedAdmin() {
       admin = await User.create({
         name: 'System Admin',
         email: adminEmail,
-        password: 'SmytheDemo123!',
+        password: adminPassword,
         role: 'admin',
         status: 'active'
       });
@@ -49,7 +51,7 @@ async function seedAdmin() {
 
     console.log('\n--- ADMIN SEEDED ---');
     console.log(`Email:    ${adminEmail}`);
-    console.log('Password: SmytheDemo123!\n');
+    console.log(`Password: ${adminPassword}\n`);
 
   } catch (error) {
     console.error('Error seeding admin:', error.message);

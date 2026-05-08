@@ -55,7 +55,10 @@ const columnValidator = {
         }
         case 'url':
           try {
-            new URL(value);
+            const parsed = new URL(value);
+            if (!['http:', 'https:'].includes(parsed.protocol)) {
+              errors.push(`"${column.name}" must use http or https`);
+            }
           } catch {
             errors.push(`"${column.name}" must be a valid URL`);
           }

@@ -77,6 +77,7 @@ const authLimiter = rateLimit({
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/otp', authLimiter);
 app.use('/api/auth/register', authLimiter);
+app.use('/api/auth/support', authLimiter);
 
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/organizations', require('./routes/organizations'));

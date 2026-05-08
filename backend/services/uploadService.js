@@ -47,15 +47,25 @@ const upload = multer({
   }
 });
 
+function safePath(storageKey) {
+  const resolved = path.resolve(UPLOAD_DIR, storageKey);
+  if (!resolved.startsWith(UPLOAD_DIR + path.sep) && resolved !== UPLOAD_DIR) {
+    throw new Error('Invalid storage path');
+  }
+  return resolved;
+}
+
 const uploadService = {
   getFilePath(storageKey) {
-    return path.join(UPLOAD_DIR, storageKey);
+    return safePath(storageKey);
   },
 
-  deleteFile(storageKey) {
-    const filePath = path.join(UPLOAD_DIR, storageKey);
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
+  async deleteFile(storageKey) {
+    const filePath = safePath(storageKey);
+    try {
+      await fs.promises.unlink(filePath);
+    } catch (err) {
+      if (err.code !== 'ENOENT') throw err;
     }
   }
 };

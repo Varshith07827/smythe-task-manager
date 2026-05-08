@@ -23,19 +23,27 @@ const buildTaskQuery = (filters, boardId) => {
     query.status = { $nin: ['completed', 'cancelled'] };
   }
   if (filters.columnFilters) {
-    const colFilters = typeof filters.columnFilters === 'string'
-      ? JSON.parse(filters.columnFilters)
-      : filters.columnFilters;
-    for (const [colId, value] of Object.entries(colFilters)) {
-      if (Array.isArray(value)) {
-        query[`columnValues.${colId}`] = { $in: value };
-      } else {
-        query[`columnValues.${colId}`] = value;
+    let colFilters;
+    try {
+      colFilters = typeof filters.columnFilters === 'string'
+        ? JSON.parse(filters.columnFilters)
+        : filters.columnFilters;
+    } catch {
+      colFilters = {};
+    }
+    if (colFilters && typeof colFilters === 'object') {
+      for (const [colId, value] of Object.entries(colFilters)) {
+        if (!/^[a-f\d]{24}$/i.test(colId)) continue;
+        if (Array.isArray(value)) {
+          query[`columnValues.${colId}`] = { $in: value };
+        } else {
+          query[`columnValues.${colId}`] = value;
+        }
       }
     }
   }
-  if (filters.search) {
-    query.$text = { $search: filters.search };
+  if (filters.search && typeof filters.search === 'string') {
+    query.$text = { $search: filters.search.slice(0, 200) };
   }
   if (filters.createdAfter) {
     query.createdAt = { $gte: new Date(filters.createdAfter) };

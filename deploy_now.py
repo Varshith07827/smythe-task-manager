@@ -192,7 +192,7 @@ run(ssh, f"mkdir -p {APP_DIR}/backend/uploads && chmod 755 {APP_DIR}/backend/upl
 
 # --- 6. Restart PM2 ---
 print("\n=== 6/7 Restart Backend (PM2) ===")
-run(ssh, f"cd {APP_DIR}/backend && pm2 delete smythe-api 2>/dev/null; pm2 delete scards-api 2>/dev/null; pm2 start server.js --name smythe-api && pm2 save", timeout=30)
+run(ssh, f"cd {APP_DIR}/backend && pm2 delete smythe-api 2>/dev/null; pm2 start server.js --name smythe-api && pm2 save", timeout=30)
 run(ssh, "sleep 3 && pm2 logs smythe-api --lines 8 --nostream")
 
 # --- 7. Configure & reload Nginx ---

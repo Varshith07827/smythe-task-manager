@@ -1,6 +1,7 @@
 const { Server } = require('socket.io');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const Board = require('../models/Board');
 
 let io;
 
@@ -30,7 +31,7 @@ const initSocket = (server) => {
       if (!token) return next(new Error('Authentication required'));
 
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      const user = await User.findById(decoded.userId).select('_id name avatar status').lean();
+      const user = await User.findById(decoded.userId).select('_id name avatar status role').lean();
       if (!user || user.status === 'inactive') return next(new Error('User not found'));
 
       socket.user = user;
@@ -44,10 +45,21 @@ const initSocket = (server) => {
     const userId = socket.user._id.toString();
     socket.join(`user:${userId}`);
 
-    socket.on('join:board', (boardId) => {
-      if (typeof boardId === 'string' && /^[a-f\d]{24}$/i.test(boardId)) {
+    socket.on('join:board', async (boardId) => {
+      if (typeof boardId !== 'string' || !/^[a-f\d]{24}$/i.test(boardId)) return;
+      try {
+        const board = await Board.findById(boardId).select('permissions createdBy').lean();
+        if (!board) return;
+        const uid = socket.user._id.toString();
+        const isAdmin = socket.user.role === 'admin';
+        const isOwner = board.createdBy?.toString() === uid;
+        const vis = board.permissions?.visibility || 'all';
+        if (!isAdmin && !isOwner && vis === 'restricted') {
+          const allowed = (board.permissions.allowedUsers || []).map(id => id.toString());
+          if (!allowed.includes(uid)) return;
+        }
         socket.join(`board:${boardId}`);
-      }
+      } catch {}
     });
 
     socket.on('leave:board', (boardId) => {

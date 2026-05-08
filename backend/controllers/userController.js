@@ -325,7 +325,7 @@ const userController = {
       const oldAvatar = existingUser?.avatar;
       if (oldAvatar?.startsWith('/api/users/avatar/')) {
         const oldFile = path.join(AVATAR_DIR, path.basename(oldAvatar));
-        if (fs.existsSync(oldFile)) fs.unlinkSync(oldFile);
+        await fs.promises.unlink(oldFile).catch(() => {});
       }
 
       const avatarUrl = `/api/users/avatar/${req.file.filename}`;

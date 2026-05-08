@@ -21,20 +21,14 @@ const requireMinRole = (minRole) => {
 };
 
 const getEditableFields = (role, board) => {
-  const fields = {
-    admin: [
-      'title', 'description', 'assignedTo', 'assignedBy', 'status',
-      'priority', 'dueDate', 'startDate', 'columnValues', 'order',
-      'parentTask', 'archived'
-    ],
-    user: ['title', 'description', 'assignedTo', 'dueDate', 'startDate', 'priority', 'status', 'columnValues', 'comments']
-  };
+  const adminFields = [
+    'title', 'description', 'assignedTo', 'assignedBy', 'status',
+    'priority', 'dueDate', 'startDate', 'columnValues', 'order',
+    'parentTask', 'archived'
+  ];
+  const userFields = ['title', 'description', 'assignedTo', 'dueDate', 'startDate', 'priority', 'status', 'columnValues', 'comments'];
 
-  if (role === 'user' && board?.permissions?.userEditableColumns?.length > 0) {
-    return { ...fields.user, editableColumns: board.permissions.userEditableColumns };
-  }
-
-  return fields[role] || [];
+  return role === 'admin' ? adminFields : userFields;
 };
 
 module.exports = { authorize, requireMinRole, getEditableFields, ROLE_HIERARCHY };

@@ -92,7 +92,7 @@ const attachmentController = {
       const attachment = await Attachment.findById(req.params.id);
       if (!attachment) return res.status(404).json({ error: 'Attachment not found' });
 
-      uploadService.deleteFile(attachment.storageKey);
+      await uploadService.deleteFile(attachment.storageKey);
 
       await Task.findByIdAndUpdate(attachment.task, {
         $pull: { attachments: attachment._id },

@@ -9,7 +9,7 @@ const validateColumnValues = async (req, res, next) => {
     const board = req.board || await Board.findById(boardId);
     if (!board) return res.status(404).json({ error: 'Board not found' });
 
-    const skipRequired = req.headers['x-import'] === 'true' || req.body._skipRequired === true;
+    const skipRequired = req.user?.role === 'admin' && (req.headers['x-import'] === 'true' || req.body._skipRequired === true);
     const { valid, errors } = columnValidator.validate(
       req.body.columnValues,
       board.columns,
