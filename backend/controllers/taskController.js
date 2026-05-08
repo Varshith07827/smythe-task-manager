@@ -261,6 +261,22 @@ const taskController = {
     }
   },
 
+  async unarchive(req, res) {
+    try {
+      const task = await Task.findByIdAndUpdate(
+        req.params.taskId,
+        { archived: false },
+        { new: true }
+      ).populate('assignedTo', 'name avatar').populate('assignedBy', 'name');
+      if (!task) return res.status(404).json({ error: 'Task not found' });
+      // Emit an update event (task was modified) so clients can reconcile archived/active lists
+      socketService.taskUpdated(task.board.toString(), task, req.user);
+      res.json(task);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  },
+
   async permanentDelete(req, res) {
     try {
       const task = await Task.findById(req.params.taskId);
@@ -585,6 +601,25 @@ const taskController = {
 
       socketService.bulkTasksUpdated(bid, taskIds, { archived: true }, req.user);
       res.json({ archived: result.modifiedCount });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  },
+
+  async bulkUnarchive(req, res) {
+    try {
+      const { taskIds, boardId } = req.body;
+      if (!taskIds?.length) return res.status(400).json({ error: 'taskIds are required' });
+      if (taskIds.length > MAX_BULK) return res.status(400).json({ error: `Maximum ${MAX_BULK} tasks per bulk operation` });
+
+      const bid = boardId || req.params.boardId;
+      const result = await Task.updateMany(
+        { _id: { $in: taskIds }, board: bid },
+        { $set: { archived: false } }
+      );
+
+      socketService.bulkTasksUpdated(bid, taskIds, { archived: false }, req.user);
+      res.json({ restored: result.modifiedCount });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }

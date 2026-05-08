@@ -41,6 +41,7 @@ router.get('/:boardId/tasks', authenticate, checkBoardAccess('view'), taskContro
 router.get('/:boardId/tasks/:taskId', authenticate, checkBoardAccess('view'), taskController.getOne);
 router.patch('/:boardId/tasks/:taskId', authenticate, checkBoardAccess('edit'), taskController.update);
 router.delete('/:boardId/tasks/:taskId', authenticate, checkBoardAccess('edit'), taskController.archive);
+router.patch('/:boardId/tasks/:taskId/unarchive', authenticate, checkBoardAccess('edit'), taskController.unarchive);
 router.delete('/:boardId/tasks/:taskId/permanent', authenticate, checkBoardAccess('edit'), taskController.permanentDelete);
 router.post('/:boardId/tasks/:taskId/remind', authenticate, authorize('admin'), taskController.remind);
 router.patch('/:boardId/tasks/:taskId/notifications', authenticate, authorize('admin'), checkBoardAccess('edit'), taskController.updateNotifications);
@@ -57,6 +58,7 @@ router.get('/:boardId/tasks/:taskId/activity', authenticate, checkBoardAccess('v
 router.post('/:boardId/tasks/bulk/assign', authenticate, authorize('admin'), checkBoardAccess('edit'), taskController.bulkAssign);
 router.post('/:boardId/tasks/bulk/status', authenticate, authorize('admin'), checkBoardAccess('edit'), taskController.bulkStatusChange);
 router.post('/:boardId/tasks/bulk/archive', authenticate, authorize('admin'), checkBoardAccess('edit'), taskController.bulkArchive);
+router.post('/:boardId/tasks/bulk/unarchive', authenticate, authorize('admin'), checkBoardAccess('edit'), taskController.bulkUnarchive);
 router.post('/:boardId/tasks/bulk/delete', authenticate, authorize('admin'), checkBoardAccess('edit'), taskController.bulkDelete);
 
 module.exports = router;

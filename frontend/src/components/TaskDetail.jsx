@@ -77,7 +77,7 @@ function FieldRow({ label, children }) {
   );
 }
 
-export default function TaskDetail({ task: initialTask, board, boardId, onClose, onUpdated, panelWidth, onResizeStart, onBoardUpdated }) {
+export default function TaskDetail({ task: initialTask, board, boardId, onClose, onUpdated, onArchived, panelWidth, onResizeStart, onBoardUpdated }) {
   const { user } = useAuth();
   const [task, setTask] = useState(initialTask);
   const [commentText, setCommentText] = useState('');
@@ -297,6 +297,24 @@ export default function TaskDetail({ task: initialTask, board, boardId, onClose,
       const res = await tasksApi.update(boardId, task._id, { columnValues });
       setTask(res.data); onUpdated(res.data);
     } catch { alert.error('Could not update field.'); }
+  };
+
+  const handleArchive = async () => {
+    try {
+      await tasksApi.archive(boardId, task._id);
+      alert.success('Task archived');
+      onArchived?.(task._id);
+      onClose();
+    } catch { alert.error('Could not archive task.'); }
+  };
+
+  const handleUnarchive = async () => {
+    try {
+      await tasksApi.unarchive(boardId, task._id);
+      alert.success('Task restored');
+      onArchived?.(task._id);
+      onClose();
+    } catch { alert.error('Could not restore task.'); }
   };
 
   const initials = (name) => name?.split(' ').map(n => n[0]).join('').toUpperCase() || '?';
@@ -684,6 +702,23 @@ export default function TaskDetail({ task: initialTask, board, boardId, onClose,
                 );
               })}
             </SubSection>
+
+            {/* Archive / Restore */}
+            {isManager && (
+              <div style={{ marginTop: 8, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
+                {task.archived ? (
+                  <button className="btn btn-primary btn-sm" onClick={handleUnarchive} style={{ gap: 6 }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 10 2.13-9.36L1 10" /></svg>
+                    Restore Task
+                  </button>
+                ) : (
+                  <button className="btn btn-danger btn-sm" onClick={handleArchive} style={{ gap: 6 }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" /></svg>
+                    Archive Task
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         )}
 

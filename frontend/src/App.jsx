@@ -12,6 +12,8 @@ import Profile from './pages/Profile';
 import Archived from './pages/Archived';
 import AdminLogs from './pages/AdminLogs';
 import WidgetView from './pages/WidgetView';
+import Support from './pages/Support';
+import PublicBoard from './pages/PublicBoard';
 import Layout from './components/Layout';
 
 function ProtectedRoute({ children }) {
@@ -28,6 +30,7 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/share/:token" element={<PublicBoard />} />
         <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
           <Route index element={<Dashboard />} />
           <Route path="boards/:boardId/notifications" element={<BoardNotifications />} />
@@ -38,6 +41,7 @@ export default function App() {
           <Route path="archived" element={<Archived />} />
           <Route path="logs" element={<AdminLogs />} />
           <Route path="widgets/:widgetId" element={<WidgetView />} />
+          <Route path="support" element={<Support />} />
         </Route>
       </Routes>
     </ConfirmProvider>

@@ -88,6 +88,8 @@ app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/activity', require('./routes/activity'));
 app.use('/api', require('./routes/attachments'));
 app.use('/api/widgets', require('./routes/widgets'));
+app.use('/api/tickets', require('./routes/tickets'));
+app.use('/api/shares', require('./routes/shares'));
 
 app.get('/api/health', (req, res) => {
   const mongoose = require('mongoose');

@@ -5,11 +5,8 @@ import { useBranding } from '../context/BrandingContext';
 import { roleLabel } from '../utils/roleLabels';
 import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { boardsApi } from '../api/boards';
-import { usersApi } from '../api/users';
 import NotificationBell from './NotificationBell';
 import { onPinChange, emitPinChange } from '../utils/pinEvents';
-import { motion } from 'framer-motion';
-import { alert } from './AlertSystem';
 
 const MAX_PINNED = 5;
 
@@ -28,12 +25,6 @@ export default function Layout() {
   });
   const profileRef = useRef(null);
   const profileDropdownRef = useRef(null);
-
-  // Support modal state
-  const [showSupportModal, setShowSupportModal] = useState(false);
-  const [supportSubject, setSupportSubject] = useState('');
-  const [supportDetails, setSupportDetails] = useState('');
-  const [sendingSupport, setSendingSupport] = useState(false);
 
   const sidebarHoverTimeout = useRef(null);
   const handleSidebarEnter = useCallback(() => {
@@ -173,14 +164,14 @@ export default function Layout() {
               </svg>
               <span className="sidebar-link-label">Settings</span>
             </NavLink>
-            <button className="sidebar-link" title="Support" onClick={() => setShowSupportModal(true)}>
+            <NavLink to="/support" className={navClass} title="Support">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="10"/>
                 <path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/>
                 <line x1="12" y1="17" x2="12.01" y2="17"/>
               </svg>
               <span className="sidebar-link-label">Support</span>
-            </button>
+            </NavLink>
             {user?.role === 'admin' && (
               <NavLink to="/archived" className={navClass} title="Archived">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
@@ -424,11 +415,11 @@ export default function Layout() {
             </svg>
             <span>Alerts</span>
           </NavLink>
-          <NavLink to="/settings" className={mobileLinkClass}>
+          <NavLink to="/support" className={mobileLinkClass}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
+              <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
             </svg>
-            <span>Settings</span>
+            <span>Support</span>
           </NavLink>
           <NavLink to="/profile" className={mobileLinkClass}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -440,75 +431,6 @@ export default function Layout() {
         document.body
       )}
 
-      {/* Support Modal */}
-      {showSupportModal && (
-        <div className="modal-overlay" onClick={() => setShowSupportModal(false)}>
-          <motion.div
-            className="modal"
-            onClick={e => e.stopPropagation()}
-            initial={{ opacity: 0, scale: 0.95, y: 10 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            transition={{ type: 'spring', damping: 28, stiffness: 400 }}
-            style={{ maxWidth: 480 }}
-          >
-            <div className="modal-header">
-              <h3>Support</h3>
-              <button className="modal-close" onClick={() => { setShowSupportModal(false); setSupportSubject(''); setSupportDetails(''); }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
-              </button>
-            </div>
-            <div className="modal-body" style={{ padding: '16px 24px 24px' }}>
-              <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 16, lineHeight: 1.5 }}>
-                Describe your issue and all administrators will be notified via email.
-              </p>
-              <div className="form-group">
-                <label className="form-label">Subject</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder="Brief description of the issue"
-                  value={supportSubject}
-                  onChange={e => setSupportSubject(e.target.value)}
-                  autoFocus
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Details</label>
-                <textarea
-                  className="form-input"
-                  placeholder="Describe your issue in detail..."
-                  value={supportDetails}
-                  onChange={e => setSupportDetails(e.target.value)}
-                  rows={4}
-                />
-              </div>
-              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                <button className="btn btn-ghost btn-sm" onClick={() => { setShowSupportModal(false); setSupportSubject(''); setSupportDetails(''); }}>Cancel</button>
-                <button
-                  className="btn btn-primary btn-sm"
-                  disabled={!supportSubject.trim() || !supportDetails.trim() || sendingSupport}
-                  onClick={async () => {
-                    setSendingSupport(true);
-                    try {
-                      await usersApi.requestPasswordSupport({ subject: supportSubject.trim(), details: supportDetails.trim() });
-                      alert.success('Support request sent to administrators');
-                      setShowSupportModal(false);
-                      setSupportSubject('');
-                      setSupportDetails('');
-                    } catch (err) {
-                      alert.error(err.response?.data?.error || 'Failed to send support request');
-                    } finally {
-                      setSendingSupport(false);
-                    }
-                  }}
-                >
-                  {sendingSupport ? 'Sending...' : 'Send to Admins'}
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        </div>
-      )}
     </div>
   );
 }

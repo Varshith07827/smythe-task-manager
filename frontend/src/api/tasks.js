@@ -6,6 +6,7 @@ export const tasksApi = {
   create: (boardId, data, options = {}) => api.post(`/boards/${boardId}/tasks`, data, options),
   update: (boardId, taskId, data) => api.patch(`/boards/${boardId}/tasks/${taskId}`, data),
   archive: (boardId, taskId) => api.delete(`/boards/${boardId}/tasks/${taskId}`),
+  unarchive: (boardId, taskId) => api.patch(`/boards/${boardId}/tasks/${taskId}/unarchive`),
   permanentDelete: (boardId, taskId) => api.delete(`/boards/${boardId}/tasks/${taskId}/permanent`),
   bulkDelete: (boardId, data) => api.post(`/boards/${boardId}/tasks/bulk/delete`, data),
 
@@ -24,5 +25,6 @@ export const tasksApi = {
   // Bulk
   bulkAssign: (boardId, data) => api.post(`/boards/${boardId}/tasks/bulk/assign`, data),
   bulkStatus: (boardId, data) => api.post(`/boards/${boardId}/tasks/bulk/status`, data),
-  bulkArchive: (boardId, data) => api.post(`/boards/${boardId}/tasks/bulk/archive`, data)
+  bulkArchive: (boardId, data) => api.post(`/boards/${boardId}/tasks/bulk/archive`, data),
+  bulkUnarchive: (boardId, data) => api.post(`/boards/${boardId}/tasks/bulk/unarchive`, data)
 };

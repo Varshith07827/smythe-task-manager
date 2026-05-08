@@ -12,6 +12,7 @@ import CreateTaskModal from '../components/CreateTaskModal';
 import ImportSpreadsheet from '../components/ImportSpreadsheet';
 import ColumnManager from '../components/ColumnManager';
 import StatusWorkflowModal from '../components/StatusWorkflowModal';
+import ShareModal from '../components/ShareModal';
 import Dropdown from '../components/Dropdown';
 import { format } from 'date-fns';
 
@@ -46,6 +47,8 @@ export default function BoardView() {
   const [showSendReport, setShowSendReport] = useState(false);
   const [reportEmail, setReportEmail] = useState('');
   const [sendingReport, setSendingReport] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
 
   // View mode: 'table' or 'list'
   const [viewMode, setViewMode] = useState(() => {
@@ -96,6 +99,7 @@ export default function BoardView() {
       if (search) params.search = search;
       if (statusFilter) params.status = statusFilter;
       if (priorityFilter) params.priority = priorityFilter;
+      if (showArchived) params.showArchived = true;
       const res = await tasksApi.getAll(boardId, params);
       setTasks(res.data.tasks);
       setTotal(res.data.total);
@@ -104,7 +108,7 @@ export default function BoardView() {
     } finally {
       setLoading(false);
     }
-  }, [boardId, search, statusFilter, priorityFilter]);
+  }, [boardId, search, statusFilter, priorityFilter, showArchived]);
 
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -130,20 +134,41 @@ export default function BoardView() {
   useEffect(() => {
     if (!socket || !boardId) return;
     socket.emit('join:board', boardId);
+
+    const belongsInView = (task) => showArchived ? !!task.archived : !task.archived;
+
     const onTaskCreated = ({ task }) => setTasks(prev => {
-      if (prev.some(t => t._id === task._id)) return prev;
+      if (!belongsInView(task) || prev.some(t => t._id === task._id)) return prev;
       return [...prev, task];
     });
     const onTaskUpdated = ({ task }) => {
-      setTasks(prev => prev.map(t => t._id === task._id ? task : t));
-      if (selectedTask?._id === task._id) setSelectedTask(task);
+      setTasks(prev => {
+        const exists = prev.some(t => t._id === task._id);
+        if (exists && !belongsInView(task)) {
+          // Task no longer belongs in this view (e.g. unarchived while viewing archived)
+          return prev.filter(t => t._id !== task._id);
+        }
+        if (exists) {
+          return prev.map(t => t._id === task._id ? task : t);
+        }
+        return prev;
+      });
+      if (selectedTask?._id === task._id) {
+        if (!belongsInView(task)) setSelectedTask(null);
+        else setSelectedTask(task);
+      }
     };
     const onTaskDeleted = ({ taskId }) => {
       setTasks(prev => prev.filter(t => t._id !== taskId));
       if (selectedTask?._id === taskId) setSelectedTask(null);
     };
     const onBulkUpdated = ({ taskIds, changes }) => {
-      setTasks(prev => prev.map(t => taskIds.includes(t._id) ? { ...t, ...changes } : t));
+      setTasks(prev => {
+        const updated = prev.map(t => taskIds.includes(t._id) ? { ...t, ...changes } : t);
+        // If archived status changed, filter out tasks that no longer belong
+        if ('archived' in changes) return updated.filter(belongsInView);
+        return updated;
+      });
     };
     const onBoardUpdated = ({ changes }) => setBoard(prev => ({ ...prev, ...changes }));
 
@@ -160,7 +185,7 @@ export default function BoardView() {
       socket.off('tasks:bulk_updated', onBulkUpdated);
       socket.off('board:updated', onBoardUpdated);
     };
-  }, [socket, boardId, selectedTask]);
+  }, [socket, boardId, selectedTask, showArchived]);
 
   const handleTaskCreated = (task) => {
     setTasks(prev => prev.some(t => t._id === task._id) ? prev : [...prev, task]);
@@ -193,12 +218,19 @@ export default function BoardView() {
 
   const handleBulkArchive = async () => {
     try {
-      await tasksApi.bulkArchive(boardId, { taskIds: [...selectedTasks], boardId });
-      setTasks(prev => prev.filter(t => !selectedTasks.has(t._id)));
-      setSelectedTasks(new Set());
-      alert.success('Tasks archived');
+      if (showArchived) {
+        await tasksApi.bulkUnarchive(boardId, { taskIds: [...selectedTasks], boardId });
+        setTasks(prev => prev.filter(t => !selectedTasks.has(t._id)));
+        setSelectedTasks(new Set());
+        alert.success('Tasks restored');
+      } else {
+        await tasksApi.bulkArchive(boardId, { taskIds: [...selectedTasks], boardId });
+        setTasks(prev => prev.filter(t => !selectedTasks.has(t._id)));
+        setSelectedTasks(new Set());
+        alert.success('Tasks archived');
+      }
     } catch {
-      alert.error('Could not archive tasks.');
+      alert.error(showArchived ? 'Could not restore tasks.' : 'Could not archive tasks.');
     }
   };
 
@@ -282,8 +314,29 @@ export default function BoardView() {
               {PRIORITY_OPTIONS.map(p => <option key={p} value={p}>{p}</option>)}
             </select>
           </div>
-          <span className="toolbar-count">{total} task{total !== 1 ? 's' : ''}</span>
+          <span className="toolbar-count">{total} {showArchived ? 'archived ' : ''}task{total !== 1 ? 's' : ''}</span>
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+            {isManager && (
+              <button
+                type="button"
+                className={`btn btn-sm ${showArchived ? 'btn-secondary' : 'btn-ghost'}`}
+                onClick={() => { setShowArchived(a => !a); setSelectedTasks(new Set()); }}
+                title={showArchived ? 'Back to active tasks' : 'View archived tasks'}
+                style={{ gap: 5, fontSize: 12 }}
+              >
+                {showArchived ? (
+                  <>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M21 8v13H3V8" /><path d="M1 3h22v5H1z" /><path d="M10 12h4" /></svg>
+                    Viewing Archived
+                  </>
+                ) : (
+                  <>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M21 8v13H3V8" /><path d="M1 3h22v5H1z" /><path d="M10 12h4" /></svg>
+                    Archived
+                  </>
+                )}
+              </button>
+            )}
             <div className="view-toggle">
               <button type="button" className={`view-toggle-btn${viewMode === 'table' ? ' active' : ''}`} onClick={() => setViewMode('table')} title="Table view">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18M3 15h18M9 3v18" /></svg>
@@ -313,6 +366,10 @@ export default function BoardView() {
                       Manage Form Fields
                     </button>
                     <div className="dropdown-divider" />
+                    <button type="button" className="dropdown-item" onClick={() => { setShowShareModal(true); close(); }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" /></svg>
+                      Share board
+                    </button>
                     <button type="button" className="dropdown-item" onClick={() => { setShowSendReport(true); close(); }}>
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22,6 12,13 2,6" /></svg>
                       Send report via email
@@ -350,7 +407,7 @@ export default function BoardView() {
                 </button>
               ))}
             </Dropdown>
-            {isManager && <button type="button" className="btn btn-sm btn-danger" onClick={handleBulkArchive}>Archive</button>}
+            {isManager && <button type="button" className={`btn btn-sm ${showArchived ? 'btn-primary' : 'btn-danger'}`} onClick={handleBulkArchive}>{showArchived ? 'Restore' : 'Archive'}</button>}
             {isManager && <button type="button" className="btn btn-sm btn-danger" onClick={() => setConfirmBulkDelete(true)}>Delete</button>}
             <button type="button" className="btn btn-sm btn-ghost" onClick={() => setSelectedTasks(new Set())}>Clear</button>
           </motion.div>
@@ -500,6 +557,10 @@ export default function BoardView() {
                 setSelectedTask(updated);
                 setTasks(prev => prev.map(t => t._id === updated._id ? updated : t));
               }}
+              onArchived={(taskId) => {
+                setTasks(prev => prev.filter(t => t._id !== taskId));
+                setSelectedTask(null);
+              }}
               panelWidth={detailWidth}
               onResizeStart={handleResizeStart}
               onBoardUpdated={loadBoard}
@@ -635,6 +696,14 @@ export default function BoardView() {
             </div>
           </motion.div>
         </div>
+      )}
+
+      {showShareModal && (
+        <ShareModal
+          boardId={boardId}
+          boardTitle={board?.title}
+          onClose={() => setShowShareModal(false)}
+        />
       )}
     </motion.div>
   );

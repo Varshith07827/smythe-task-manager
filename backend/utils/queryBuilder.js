@@ -1,5 +1,13 @@
 const buildTaskQuery = (filters, boardId) => {
-  const query = { board: boardId, archived: { $ne: true } };
+  const query = { board: boardId };
+  // Show archived tasks only when explicitly requested
+  if (filters.showArchived === 'true' || filters.showArchived === true) {
+    query.archived = true;
+  } else {
+    query.archived = { $ne: true };
+  }
+  // Remove showArchived so it doesn't pollute other filters
+  delete filters.showArchived;
 
   if (filters.status) {
     query.status = Array.isArray(filters.status) ? { $in: filters.status } : filters.status;
