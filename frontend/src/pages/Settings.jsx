@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { usersApi } from '../api/users';
 import { authApi } from '../api/auth';
@@ -49,7 +49,12 @@ export default function Settings() {
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteName, setInviteName] = useState('');
   const [inviteRole, setInviteRole] = useState('user');
-  const [activeTab, setActiveTab] = useState(() => user?.role === 'admin' ? 'users' : 'notifications');
+  const [searchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState(() => {
+    const paramTab = searchParams.get('tab');
+    if (paramTab && ['users', 'notifications', 'branding', 'automations'].includes(paramTab)) return paramTab;
+    return user?.role === 'admin' ? 'users' : 'notifications';
+  });
   const [savingMemberNotifyId, setSavingMemberNotifyId] = useState(null);
   const [branding, setBranding] = useState({ appTitle: 'Smythe', tagline: '', logoUrl: '', logoShape: 'rounded', accentColor: '#0a84ff', logoSize: 48, headerLogoUrl: '', headerLogoHeight: 36, headerLogoScale: 1, faviconUrl: '', siteTitle: '', sidebarColor: '#1a1a2e', useSameLogo: true, showLogoInHeader: true, showLogoInSidebar: true, showFaviconInSidebar: true, showNameInHeader: true });
   const [allowSignup, setAllowSignup] = useState(false);
@@ -64,13 +69,6 @@ export default function Settings() {
   const [editPhone, setEditPhone] = useState('');
   const [editRole, setEditRole] = useState('user');
   const [savingEdit, setSavingEdit] = useState(false);
-  const [showSupportPasswordPrompt, setShowSupportPasswordPrompt] = useState(false);
-  const [supportPasswordInput, setSupportPasswordInput] = useState('');
-  const [verifyingPassword, setVerifyingPassword] = useState(false);
-  const [showPasswordSupport, setShowPasswordSupport] = useState(false);
-  const [supportSubject, setSupportSubject] = useState('');
-  const [supportDetails, setSupportDetails] = useState('');
-  const [sendingSupport, setSendingSupport] = useState(false);
   const [automations, setAutomations] = useState(null);
   const [savingAutomations, setSavingAutomations] = useState(false);
   const [triggeringJob, setTriggeringJob] = useState(null);
@@ -86,6 +84,13 @@ export default function Settings() {
       setMembers([]);
     }
   }, [isAdmin, user]);
+
+  useEffect(() => {
+    const paramTab = searchParams.get('tab');
+    if (paramTab && ['users', 'notifications', 'branding', 'automations'].includes(paramTab)) {
+      setActiveTab(paramTab);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (user) loadMembers();
@@ -242,13 +247,13 @@ export default function Settings() {
       </div>
 
       <div className="filter-pills" style={{ marginBottom: 24 }}>
-        {[...(isAdmin ? ['users'] : []), 'notifications', 'security', 'support', ...(isAdmin ? ['branding', 'automations'] : [])].map(tab => (
+        {[...(isAdmin ? ['users'] : []), 'notifications', ...(isAdmin ? ['branding', 'automations'] : [])].map(tab => (
           <button
             key={tab}
             className={`filter-pill ${activeTab === tab ? 'active' : ''}`}
             onClick={() => setActiveTab(tab)}
           >
-            {tab === 'support' ? 'Support' : tab === 'users' ? 'Users' : tab === 'automations' ? 'Automations' : tab.charAt(0).toUpperCase() + tab.slice(1)}
+            {tab === 'users' ? 'Users' : tab === 'automations' ? 'Automations' : tab.charAt(0).toUpperCase() + tab.slice(1)}
           </button>
         ))}
       </div>
@@ -406,19 +411,6 @@ export default function Settings() {
         </motion.div>
       )}
 
-      {activeTab === 'security' && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }}>
-          <CollapsibleCard title="Account security">
-            <p style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: 16 }}>
-              Password and profile settings have moved to your personal profile page.
-            </p>
-            <button className="btn btn-secondary" onClick={() => navigate('/profile')}>
-              Go to My Profile
-            </button>
-          </CollapsibleCard>
-        </motion.div>
-      )}
-
       {confirmRemove && (
         <div className="modal-overlay">
           <motion.div
@@ -489,163 +481,6 @@ export default function Settings() {
         </div>
       )}
 
-      {activeTab === 'support' && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }}>
-          <CollapsibleCard title="Support" defaultOpen>
-            <p style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: 16 }}>
-              Need help with your account or password? Submit a support request and our administrators will assist you.
-            </p>
-            <button className="btn btn-secondary" onClick={() => { setSupportPasswordInput(''); setShowSupportPasswordPrompt(true); }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0110 0v4" />
-              </svg>
-              Contact Support
-            </button>
-          </CollapsibleCard>
-        </motion.div>
-      )}
-
-      {showSupportPasswordPrompt && (
-        <div className="modal-overlay">
-          <motion.div
-            className="modal"
-            onClick={e => e.stopPropagation()}
-            initial={{ opacity: 0, scale: 0.95, y: 10 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            transition={{ type: 'spring', damping: 28, stiffness: 400 }}
-            style={{ maxWidth: 400 }}
-          >
-            <div className="modal-header">
-              <h3>Verify Identity</h3>
-              <button className="modal-close" onClick={() => setShowSupportPasswordPrompt(false)}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
-              </button>
-            </div>
-            <div className="modal-body" style={{ padding: '16px 24px 24px' }}>
-              <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 16, lineHeight: 1.5 }}>
-                Enter your account password to access support.
-              </p>
-              <div className="form-group">
-                <label className="form-label">Password</label>
-                <input
-                  type="password"
-                  className="form-input"
-                  placeholder="Your account password"
-                  value={supportPasswordInput}
-                  onChange={e => setSupportPasswordInput(e.target.value)}
-                  autoFocus
-                  onKeyDown={async e => {
-                    if (e.key === 'Enter' && supportPasswordInput.trim() && !verifyingPassword) {
-                      setVerifyingPassword(true);
-                      try {
-                        await usersApi.verifyPassword(supportPasswordInput);
-                        setShowSupportPasswordPrompt(false);
-                        setSupportPasswordInput('');
-                        setShowPasswordSupport(true);
-                      } catch (err) {
-                        alert.error(err.response?.data?.error || 'Incorrect password');
-                      } finally {
-                        setVerifyingPassword(false);
-                      }
-                    }
-                  }}
-                />
-              </div>
-              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                <button className="btn btn-ghost btn-sm" onClick={() => setShowSupportPasswordPrompt(false)}>Cancel</button>
-                <button
-                  className="btn btn-primary btn-sm"
-                  disabled={!supportPasswordInput.trim() || verifyingPassword}
-                  onClick={async () => {
-                    setVerifyingPassword(true);
-                    try {
-                      await usersApi.verifyPassword(supportPasswordInput);
-                      setShowSupportPasswordPrompt(false);
-                      setSupportPasswordInput('');
-                      setShowPasswordSupport(true);
-                    } catch (err) {
-                      alert.error(err.response?.data?.error || 'Incorrect password');
-                    } finally {
-                      setVerifyingPassword(false);
-                    }
-                  }}
-                >
-                  {verifyingPassword ? 'Verifying...' : 'Continue'}
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        </div>
-      )}
-
-      {showPasswordSupport && (
-        <div className="modal-overlay">
-          <motion.div
-            className="modal"
-            onClick={e => e.stopPropagation()}
-            initial={{ opacity: 0, scale: 0.95, y: 10 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            transition={{ type: 'spring', damping: 28, stiffness: 400 }}
-            style={{ maxWidth: 480 }}
-          >
-            <div className="modal-header">
-              <h3>Support</h3>
-              <button className="modal-close" onClick={() => { setShowPasswordSupport(false); setSupportSubject(''); setSupportDetails(''); }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
-              </button>
-            </div>
-            <div className="modal-body" style={{ padding: '16px 24px 24px' }}>
-              <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 16, lineHeight: 1.5 }}>
-                Describe your issue and all administrators will be notified via email.
-              </p>
-              <div className="form-group">
-                <label className="form-label">Subject</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder="Brief description of the issue"
-                  value={supportSubject}
-                  onChange={e => setSupportSubject(e.target.value)}
-                  autoFocus
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Details</label>
-                <textarea
-                  className="form-input"
-                  placeholder="Describe your issue in detail..."
-                  value={supportDetails}
-                  onChange={e => setSupportDetails(e.target.value)}
-                  rows={4}
-                />
-              </div>
-              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                <button className="btn btn-ghost btn-sm" onClick={() => { setShowPasswordSupport(false); setSupportSubject(''); setSupportDetails(''); }}>Cancel</button>
-                <button
-                  className="btn btn-primary btn-sm"
-                  disabled={!supportSubject.trim() || !supportDetails.trim() || sendingSupport}
-                  onClick={async () => {
-                    setSendingSupport(true);
-                    try {
-                      await usersApi.requestPasswordSupport({ subject: supportSubject.trim(), details: supportDetails.trim() });
-                      alert.success('Support request sent to administrators');
-                      setShowPasswordSupport(false);
-                      setSupportSubject('');
-                      setSupportDetails('');
-                    } catch (err) {
-                      alert.error(err.response?.data?.error || 'Failed to send support request');
-                    } finally {
-                      setSendingSupport(false);
-                    }
-                  }}
-                >
-                  {sendingSupport ? 'Sending...' : 'Send to Admins'}
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        </div>
-      )}
 
       {activeTab === 'automations' && isAdmin && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }}>
@@ -858,8 +693,7 @@ export default function Settings() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
 
             {/* ── App Details ── */}
-            <div className="card" style={{ padding: 20 }}>
-              <h3 style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 16 }}>App Details</h3>
+            <CollapsibleCard title="App Details" defaultOpen>
               <div style={{ display: 'grid', gap: 16 }}>
                 <div className="form-group" style={{ marginBottom: 0 }}>
                   <label className="form-label">App Title</label>
@@ -875,11 +709,10 @@ export default function Settings() {
                   <input type="text" className="form-input" value={branding.tagline} onChange={e => setBranding(b => ({ ...b, tagline: e.target.value }))} placeholder="Organize work, effortlessly." />
                 </div>
               </div>
-            </div>
+            </CollapsibleCard>
 
             {/* ── Colors & Theming ── */}
-            <div className="card" style={{ padding: 20 }}>
-              <h3 style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 16 }}>Colors & Theming</h3>
+            <CollapsibleCard title="Colors & Theming" defaultOpen>
               <div style={{ display: 'grid', gap: 20 }}>
 
                 <div className="form-group" style={{ marginBottom: 0 }}>
@@ -1013,11 +846,10 @@ export default function Settings() {
                   </p>
                 </div>
               </div>
-            </div>
+            </CollapsibleCard>
 
             {/* ── Logos & Media ── */}
-            <div className="card" style={{ padding: 20 }}>
-              <h3 style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 16 }}>Logos & Media</h3>
+            <CollapsibleCard title="Logos & Media" defaultOpen>
               <div style={{ display: 'grid', gap: 16 }}>
                 <div className="form-group" style={{ marginBottom: 0 }}>
                   <label className="form-label">Site Logo</label>
@@ -1097,11 +929,10 @@ export default function Settings() {
                   )}
                 </div>
               </div>
-            </div>
+            </CollapsibleCard>
 
             {/* ── Settings ── */}
-            <div className="card" style={{ padding: 20 }}>
-              <h3 style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 16 }}>Settings</h3>
+            <CollapsibleCard title="Settings" defaultOpen>
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <label className="form-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   Allow Public Sign-Up
@@ -1116,7 +947,7 @@ export default function Settings() {
                   When enabled, a "Sign Up" link appears on the login page allowing new users to create accounts.
                 </p>
               </div>
-            </div>
+            </CollapsibleCard>
 
             <button
               type="button"

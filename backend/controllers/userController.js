@@ -98,8 +98,7 @@ const userController = {
       const user = await User.findById(userId).select('name email role status');
       if (!user) return res.status(404).json({ error: 'User not found' });
 
-      const boardIds = await Board.find().distinct('_id');
-      const affectedTasks = await Task.find({ board: { $in: boardIds }, assignedTo: userId })
+      const affectedTasks = await Task.find({ assignedTo: userId })
         .select('_id title board')
         .lean();
       const affectedBoards = [...new Map(affectedTasks.map(task => [task.board.toString(), task.board])).values()];

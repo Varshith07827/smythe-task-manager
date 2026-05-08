@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
+import { useNavigate } from 'react-router-dom';
 import { notificationsApi } from '../api/notifications';
 import { useSocket } from '../context/SocketContext';
 import { useAuth } from '../context/AuthContext';
@@ -9,6 +10,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 export default function NotificationBell() {
   const { user } = useAuth();
   const socket = useSocket();
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [open, setOpen] = useState(false);
@@ -38,10 +40,10 @@ export default function NotificationBell() {
   useEffect(() => {
     if (!socket) return;
     const handler = (notification) => {
-      if (notification.targetUserId === user?._id) {
-        setUnreadCount(c => c + 1);
-        setNotifications(prev => [notification, ...prev]);
-      }
+      // Socket room `user:<id>` already ensures only this user receives it,
+      // so no additional client-side filter is needed.
+      setUnreadCount(c => c + 1);
+      setNotifications(prev => [notification, ...prev]);
     };
     socket.on('notification:new', handler);
     return () => socket.off('notification:new', handler);
@@ -93,6 +95,18 @@ export default function NotificationBell() {
     setNotifications(prev => prev.map(n => n._id === id ? { ...n, read: true } : n));
   };
 
+  const handleNotificationClick = async (n) => {
+    // Mark as read if unread
+    if (!n.read) handleMarkRead(n._id);
+    // Navigate to the board/task
+    const boardId = n.board?._id || n.board;
+    const taskId = n.task?._id || n.task;
+    if (boardId) {
+      setOpen(false);
+      navigate(taskId ? `/boards/${boardId}?task=${taskId}` : `/boards/${boardId}`);
+    }
+  };
+
   return (
     <div className="notification-bell" ref={ref}>
       <button className="btn btn-ghost" onClick={handleOpen} style={{ position: 'relative' }}>
@@ -142,11 +156,14 @@ export default function NotificationBell() {
                   You're all caught up
                 </div>
               ) : (
-                notifications.map(n => (
+                notifications.map(n => {
+                  const boardId = n.board?._id || n.board;
+                  return (
                   <motion.div
                     key={n._id}
                     className={`notification-item ${!n.read ? 'unread' : ''}`}
-                    onClick={() => !n.read && handleMarkRead(n._id)}
+                    onClick={() => handleNotificationClick(n)}
+                    style={{ cursor: boardId ? 'pointer' : 'default' }}
                     initial={{ opacity: 0, x: -8 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ duration: 0.15 }}
@@ -157,7 +174,8 @@ export default function NotificationBell() {
                       {n.createdAt ? formatDistanceToNow(new Date(n.createdAt), { addSuffix: true }) : ''}
                     </div>
                   </motion.div>
-                ))
+                  );
+                })
               )}
             </motion.div>
           )}

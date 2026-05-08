@@ -13,6 +13,8 @@ import {
 } from 'recharts';
 import CreateBoardModal from '../components/CreateBoardModal';
 import ImportSpreadsheet from '../components/ImportSpreadsheet';
+import WidgetModal from '../components/WidgetModal';
+import { widgetsApi } from '../api/widgets';
 import Dropdown from '../components/Dropdown';
 
 const container = {
@@ -34,6 +36,9 @@ export default function Dashboard() {
   const [showCreate, setShowCreate] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
+  const [widgets, setWidgets] = useState([]);
+  const [showWidgetModal, setShowWidgetModal] = useState(false);
+  const [editingWidget, setEditingWidget] = useState(null);
   const [showStats, setShowStats] = useState(() => {
     try { return JSON.parse(localStorage.getItem('smythe:showStats')) === true; } catch { return false; }
   });
@@ -62,6 +67,7 @@ export default function Dashboard() {
     });
   };
 
+  // ===== Board drag-to-reorder =====
   const orderKey = `smythe:boardOrder:${user?._id || 'default'}`;
   const dragItem = useRef(null);
   const dragOverItem = useRef(null);
@@ -99,7 +105,45 @@ export default function Dashboard() {
     } catch { return boardList; }
   }, [orderKey]);
 
-  useEffect(() => { loadBoards(); }, []);
+  // ===== Widget drag-to-reorder =====
+  const widgetOrderKey = `smythe:widgetOrder:${user?._id || 'default'}`;
+  const wDragItem = useRef(null);
+  const wDragOverItem = useRef(null);
+  const [wDragFromIdx, setWDragFromIdx] = useState(null);
+  const [wDragOverIdx, setWDragOverIdx] = useState(null);
+
+  const handleWidgetDragStart = (index) => { wDragItem.current = index; setWDragFromIdx(index); };
+  const handleWidgetDragEnter = (index) => { wDragOverItem.current = index; setWDragOverIdx(index); };
+  const handleWidgetDragEnd = () => {
+    if (wDragItem.current === null || wDragOverItem.current === null || wDragItem.current === wDragOverItem.current) {
+      wDragItem.current = null; wDragOverItem.current = null;
+      setWDragFromIdx(null); setWDragOverIdx(null);
+      return;
+    }
+    const reordered = [...widgets];
+    const [removed] = reordered.splice(wDragItem.current, 1);
+    reordered.splice(wDragOverItem.current, 0, removed);
+    setWidgets(reordered);
+    localStorage.setItem(widgetOrderKey, JSON.stringify(reordered.map(w => w._id)));
+    wDragItem.current = null;
+    wDragOverItem.current = null;
+    setWDragFromIdx(null); setWDragOverIdx(null);
+  };
+
+  const applyStoredWidgetOrder = useCallback((widgetList) => {
+    try {
+      const stored = JSON.parse(localStorage.getItem(widgetOrderKey));
+      if (!Array.isArray(stored) || stored.length === 0) return widgetList;
+      const orderMap = new Map(stored.map((id, i) => [id, i]));
+      return [...widgetList].sort((a, b) => {
+        const ai = orderMap.has(a._id) ? orderMap.get(a._id) : 9999;
+        const bi = orderMap.has(b._id) ? orderMap.get(b._id) : 9999;
+        return ai - bi;
+      });
+    } catch { return widgetList; }
+  }, [widgetOrderKey]);
+
+  useEffect(() => { loadBoards(); loadWidgets(); }, []);
   useEffect(() => { localStorage.setItem('smythe:showStats', JSON.stringify(showStats)); }, [showStats]);
 
   // Sync pins when changed from sidebar
@@ -126,6 +170,48 @@ export default function Dashboard() {
       setArchivedBoards(res.data);
     } catch {
       alert.error('Could not load archived projects.');
+    }
+  };
+
+  const loadWidgets = async () => {
+    try {
+      const res = await widgetsApi.getAll();
+      setWidgets(applyStoredWidgetOrder(res.data));
+    } catch {}
+  };
+
+  const handleWidgetSaved = (saved) => {
+    if (editingWidget) {
+      setWidgets(prev => prev.map(w => w._id === saved._id ? saved : w));
+    } else {
+      setWidgets(prev => {
+        const next = [saved, ...prev];
+        localStorage.setItem(widgetOrderKey, JSON.stringify(next.map(w => w._id)));
+        return next;
+      });
+    }
+    setShowWidgetModal(false);
+    setEditingWidget(null);
+  };
+
+  const handleDeleteWidget = async (e, widgetId, widgetName) => {
+    e.stopPropagation();
+    if (!(await confirm({
+      title: 'Delete Widget',
+      message: `Remove "${widgetName}"? This cannot be undone.`,
+      confirmText: 'Delete',
+      variant: 'danger'
+    }))) return;
+    try {
+      await widgetsApi.delete(widgetId);
+      setWidgets(prev => {
+        const next = prev.filter(w => w._id !== widgetId);
+        localStorage.setItem(widgetOrderKey, JSON.stringify(next.map(w => w._id)));
+        return next;
+      });
+      alert.success('Widget deleted');
+    } catch {
+      alert.error('Could not delete widget.');
     }
   };
 
@@ -236,6 +322,11 @@ export default function Dashboard() {
                 <button type="button" className="dropdown-item" onClick={() => { setShowImport(true); close(); }}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                   Import spreadsheet
+                </button>
+                <div style={{ height: 1, background: 'var(--separator)', margin: '4px 0' }} />
+                <button type="button" className="dropdown-item" onClick={() => { setShowWidgetModal(true); setEditingWidget(null); close(); }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                  New widget
                 </button>
               </>
             )}
@@ -416,6 +507,95 @@ export default function Dashboard() {
         </motion.div>
       )}
 
+      {/* My Widgets */}
+      {widgets.length > 0 && (
+        <motion.div variants={item} style={{ marginTop: 32 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+            <h3 style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-secondary)', letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" style={{ opacity: 0.6 }}>
+                <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+              </svg>
+              My Widgets
+            </h3>
+            <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>{widgets.length} widget{widgets.length !== 1 ? 's' : ''}</span>
+          </div>
+          <div className="widget-grid">
+            {widgets.map((w, i) => {
+              let domain = '';
+              let favicon = '';
+              try {
+                domain = new URL(w.url).hostname;
+                favicon = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=32`;
+              } catch {}
+
+              const wIsDragging = wDragFromIdx === i;
+              const wIsDropTarget = wDragFromIdx !== null && wDragOverIdx === i && wDragFromIdx !== i;
+              const wDropSide = wIsDropTarget ? (wDragFromIdx < i ? 'right' : 'left') : null;
+
+              return (
+                <motion.div
+                  key={w._id}
+                  className={`widget-card${wIsDragging ? ' drag-source' : ''}${wDropSide === 'left' ? ' drop-indicator-left' : ''}${wDropSide === 'right' ? ' drop-indicator-right' : ''}`}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.05 }}
+                  whileHover={{ y: -2 }}
+                  draggable
+                  onDragStart={() => handleWidgetDragStart(i)}
+                  onDragEnter={() => handleWidgetDragEnter(i)}
+                  onDragEnd={handleWidgetDragEnd}
+                  onDragOver={(e) => e.preventDefault()}
+                >
+                  <div className="widget-card-header">
+                    <div className="widget-card-icon">
+                      {favicon ? (
+                        <img src={favicon} alt="" width="20" height="20" style={{ borderRadius: 4 }} onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} />
+                      ) : null}
+                      <div className="widget-card-icon-fallback" style={favicon ? { display: 'none' } : undefined}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                          <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+                        </svg>
+                      </div>
+                    </div>
+                    <div className="widget-card-actions">
+                      <button
+                        className="widget-card-action-btn"
+                        onClick={(e) => { e.stopPropagation(); setEditingWidget(w); setShowWidgetModal(true); }}
+                        title="Edit"
+                      >
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                          <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                        </svg>
+                      </button>
+                      <button
+                        className="widget-card-action-btn widget-card-action-btn-danger"
+                        onClick={(e) => handleDeleteWidget(e, w._id, w.name)}
+                        title="Delete"
+                      >
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                          <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                  <h4 className="widget-card-name">{w.name}</h4>
+                  <p className="widget-card-domain">{domain}</p>
+                  <button
+                    className="btn btn-primary btn-sm widget-card-open"
+                    onClick={() => navigate(`/widgets/${w._id}`)}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                      <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+                    </svg>
+                    Open
+                  </button>
+                </motion.div>
+              );
+            })}
+          </div>
+        </motion.div>
+      )}
+
       {/* Archived Projects */}
       <AnimatePresence>
         {showArchived && (
@@ -486,6 +666,16 @@ export default function Dashboard() {
       <AnimatePresence>
         {showCreate && (
           <CreateBoardModal onClose={() => setShowCreate(false)} onCreated={handleBoardCreated} />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showWidgetModal && (
+          <WidgetModal
+            widget={editingWidget}
+            onClose={() => { setShowWidgetModal(false); setEditingWidget(null); }}
+            onSaved={handleWidgetSaved}
+          />
         )}
       </AnimatePresence>
 

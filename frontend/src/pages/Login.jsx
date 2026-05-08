@@ -319,7 +319,7 @@ export default function Login() {
       </main>
 
       {showSupport && (
-        <div className="modal-overlay">
+        <div className="modal-overlay" onClick={() => setShowSupport(false)}>
           <motion.div
             className="modal"
             onClick={e => e.stopPropagation()}

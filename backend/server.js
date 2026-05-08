@@ -33,6 +33,7 @@ app.use(helmet({
       connectSrc: ["'self'", ...allowedOrigins],
       fontSrc: ["'self'"],
       objectSrc: ["'none'"],
+      frameSrc: ["https:", "http:"],
       frameAncestors: ["'none'"],
       baseUri: ["'self'"],
       formAction: ["'self'"]
@@ -86,6 +87,7 @@ app.use('/api/users', require('./routes/users'));
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/activity', require('./routes/activity'));
 app.use('/api', require('./routes/attachments'));
+app.use('/api/widgets', require('./routes/widgets'));
 
 app.get('/api/health', (req, res) => {
   const mongoose = require('mongoose');

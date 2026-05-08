@@ -365,30 +365,32 @@ const authController = {
       if (!email) return res.status(400).json({ error: 'Email is required' });
       if (!subject?.trim() || !details?.trim()) return res.status(400).json({ error: 'Subject and details are required' });
 
-      const user = await User.findOne({ email: email.toLowerCase().trim() });
+      const normalizedEmail = email.toLowerCase().trim();
+      const user = await User.findOne({ email: normalizedEmail });
 
-      if (user) {
-        const admins = await User.find({
-          role: 'admin',
-          status: 'active'
-        }).select('email name').lean();
+      const admins = await User.find({
+        role: 'admin',
+        status: 'active'
+      }).select('email name').lean();
 
-        if (admins.length) {
-          const branding = await emailService.getAppBranding();
-          const appName = branding.appTitle || 'Smythe';
-          const timestamp = new Date().toISOString();
+      if (admins.length) {
+        const branding = await emailService.getAppBranding();
+        const appName = branding.appTitle || 'Smythe';
+        const timestamp = new Date().toISOString();
 
-          const htmlBody = emailService.buildNotificationEmail(
-            `Support Request: ${subject.trim().slice(0, 200)}`,
-            `From: ${user.name} (${user.email})\nDate: ${timestamp}\n\nSubject: ${subject.trim().slice(0, 200)}\n\nDetails:\n${details.trim().slice(0, 5000)}`,
-            'reminder',
-            branding
-          );
+        const senderName = user ? user.name : normalizedEmail;
+        const senderInfo = user ? `${user.name} (${user.email})` : `${normalizedEmail} (unregistered)`;
 
-          const emailSubject = `${appName} - Support Request from ${user.name}`;
-          for (const admin of admins) {
-            emailService.send(admin.email, emailSubject, htmlBody).catch(() => {});
-          }
+        const htmlBody = emailService.buildNotificationEmail(
+          `Support Request: ${subject.trim().slice(0, 200)}`,
+          `From: ${senderInfo}\nDate: ${timestamp}\n\nSubject: ${subject.trim().slice(0, 200)}\n\nDetails:\n${details.trim().slice(0, 5000)}`,
+          'reminder',
+          branding
+        );
+
+        const emailSubject = `${appName} - Support Request from ${senderName}`;
+        for (const admin of admins) {
+          emailService.send(admin.email, emailSubject, htmlBody).catch(() => {});
         }
       }
 

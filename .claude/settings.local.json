@@ -37,7 +37,14 @@
       "Bash(node -e \"const mongoose = require\\('mongoose'\\); mongoose.connect\\('mongodb://localhost:27017/taskmanager'\\).then\\(\\(\\) => { console.log\\('MONGO_OK'\\); mongoose.disconnect\\(\\); }\\).catch\\(e => console.log\\('MONGO_FAIL:', e.message\\)\\);\")",
       "Bash(timeout 8 bash -c 'cd \"C:\\\\Users\\\\manoh\\\\Downloads\\\\smythe-task-manager-main\\\\backend\" && node -e \"const mongoose = require\\(\\\\\"mongoose\\\\\"\\); mongoose.connect\\(\\\\\"mongodb://localhost:27017/taskmanager\\\\\", {serverSelectionTimeoutMS: 5000}\\).then\\(\\(\\) => { console.log\\(\\\\\"MONGO_OK\\\\\"\\); process.exit\\(0\\); }\\).catch\\(e => { console.log\\(\\\\\"MONGO_FAIL:\\\\\", e.message\\); process.exit\\(1\\); }\\);\"')",
       "Bash(curl -s -X POST http://localhost:5000/api/auth/register -H \"Content-Type: application/json\" -d '{\"name\":\"Admin User\",\"email\":\"creator@smythe.local\",\"password\":\"SmytheDemo123!\",\"organizationName\":\"Smythe Demo\"}')",
-      "Bash(grep -E \"\\\\.\\(js|jsx\\)$\")"
+      "Bash(grep -E \"\\\\.\\(js|jsx\\)$\")",
+      "Bash(git rm *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git log *)",
+      "Bash(node -c controllers/taskController.js)",
+      "Bash(node -e ' *)",
+      "Bash(node -e \"require\\('./controllers/widgetController'\\); require\\('./routes/widgets'\\); console.log\\('Backend widget files OK'\\)\")"
     ]
   }
 }

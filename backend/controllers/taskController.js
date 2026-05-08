@@ -202,31 +202,40 @@ const taskController = {
       });
 
       if (newStatusValue) {
-        const actorId = req.user._id.toString();
-        const recipientIds = new Set(
-          (task.assignedTo || []).map(id => id.toString()).filter(id => id !== actorId)
-        );
+        // Respect per-task notification settings
+        const tn = task.taskNotifications || {};
+        const taskStatusNotifEnabled = tn.statusChanged !== false;
+        const allowedStatuses = Array.isArray(tn.notifyOnStatuses) && tn.notifyOnStatuses.length > 0
+          ? tn.notifyOnStatuses : null;
+        const statusAllowed = !allowedStatuses || allowedStatuses.includes(newStatusValue);
 
-        if (recipientIds.size === 0) {
-          const orgAdmins = await User.find({
-            role: 'admin',
-            _id: { $ne: req.user._id }
-          }).select('_id').lean();
-          for (const a of orgAdmins) recipientIds.add(a._id.toString());
-        }
+        if (taskStatusNotifEnabled && statusAllowed) {
+          const actorId = req.user._id.toString();
+          const recipientIds = new Set(
+            (task.assignedTo || []).map(id => id.toString()).filter(id => id !== actorId)
+          );
 
-        const statusLabel = newStatusValue.replace(/_/g, ' ');
-        for (const rid of recipientIds) {
-          await notificationService.create({
-            recipient: rid,
-            sender: req.user._id,
-            type: 'status_changed',
-            title: 'Task status updated',
-            message: `${req.user.name} moved "${task.title}" to ${statusLabel}`,
-            board: task.board,
-            task: task._id,
-            newStatus: newStatusValue
-          });
+          if (recipientIds.size === 0) {
+            const orgAdmins = await User.find({
+              role: 'admin',
+              _id: { $ne: req.user._id }
+            }).select('_id').lean();
+            for (const a of orgAdmins) recipientIds.add(a._id.toString());
+          }
+
+          const statusLabel = newStatusValue.replace(/_/g, ' ');
+          for (const rid of recipientIds) {
+            await notificationService.create({
+              recipient: rid,
+              sender: req.user._id,
+              type: 'status_changed',
+              title: 'Task status updated',
+              message: `${req.user.name} moved "${task.title}" to ${statusLabel}`,
+              board: task.board,
+              task: task._id,
+              newStatus: newStatusValue
+            });
+          }
         }
       }
 
@@ -508,11 +517,19 @@ const taskController = {
         _id: { $in: taskIds },
         board: bid,
         archived: { $ne: true }
-      }).select('title assignedTo assignedBy board').lean();
+      }).select('title assignedTo assignedBy board taskNotifications').lean();
 
       const actorId = req.user._id.toString();
       const statusLabel = status.replace(/_/g, ' ');
       for (const t of tasks) {
+        // Respect per-task notification settings
+        const tn = t.taskNotifications || {};
+        const taskStatusNotifEnabled = tn.statusChanged !== false;
+        const allowedStatuses = Array.isArray(tn.notifyOnStatuses) && tn.notifyOnStatuses.length > 0
+          ? tn.notifyOnStatuses : null;
+        const statusAllowed = !allowedStatuses || allowedStatuses.includes(status);
+        if (!taskStatusNotifEnabled || !statusAllowed) continue;
+
         const recipientIds = new Set();
         for (const uid of t.assignedTo || []) {
           if (uid.toString() !== actorId) recipientIds.add(uid.toString());
@@ -577,10 +594,20 @@ const taskController = {
     try {
       const task = await Task.findById(req.params.taskId);
       if (!task) return res.status(404).json({ error: 'Task not found' });
-      const { dailyReminder, intervalReminder, urgentMode } = req.body;
+      const { dailyReminder, intervalReminder, urgentMode,
+              statusChanged, notifyOnStatuses, deliveryMode,
+              quietHoursEnabled, quietHoursStart, quietHoursEnd } = req.body;
       if (dailyReminder !== undefined) Object.assign(task.taskNotifications.dailyReminder, dailyReminder);
       if (intervalReminder !== undefined) Object.assign(task.taskNotifications.intervalReminder, intervalReminder);
       if (urgentMode !== undefined) Object.assign(task.taskNotifications.urgentMode, urgentMode);
+      if (statusChanged !== undefined) task.taskNotifications.statusChanged = statusChanged;
+      if (notifyOnStatuses !== undefined) task.taskNotifications.notifyOnStatuses = notifyOnStatuses;
+      if (deliveryMode !== undefined) task.taskNotifications.deliveryMode = deliveryMode;
+      if (quietHoursEnabled !== undefined) task.taskNotifications.quietHoursEnabled = quietHoursEnabled;
+      if (quietHoursStart !== undefined) task.taskNotifications.quietHoursStart = quietHoursStart;
+      if (quietHoursEnd !== undefined) task.taskNotifications.quietHoursEnd = quietHoursEnd;
+
+      task.markModified('taskNotifications');
 
       activityService.addTaskHistory(task, {
         changedBy: req.user._id,

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { boardsApi } from '../api/boards';
 import { tasksApi } from '../api/tasks';
 import { useSocket } from '../context/SocketContext';
@@ -106,7 +106,26 @@ export default function BoardView() {
     }
   }, [boardId, search, statusFilter, priorityFilter]);
 
+  const [searchParams, setSearchParams] = useSearchParams();
+
   useEffect(() => { setLoading(true); loadBoard(); loadTasks(); }, [loadBoard, loadTasks]);
+
+  // Auto-open task from notification link (?task=taskId)
+  useEffect(() => {
+    const taskParam = searchParams.get('task');
+    if (taskParam && tasks.length > 0) {
+      const found = tasks.find(t => t._id === taskParam);
+      if (found) {
+        setSelectedTask(found);
+        // Clean up the query param
+        setSearchParams(prev => {
+          const next = new URLSearchParams(prev);
+          next.delete('task');
+          return next;
+        }, { replace: true });
+      }
+    }
+  }, [searchParams, tasks, setSearchParams]);
 
   useEffect(() => {
     if (!socket || !boardId) return;

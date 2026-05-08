@@ -124,8 +124,24 @@ const boardController = {
 
   async getArchived(req, res) {
     try {
-      const boards = await Board.find({ archived: true })
-        .select('title description color createdAt columns permissions.visibility')
+      let query = { archived: true };
+
+      // Non-admin users should only see archived boards they created or are assigned to
+      if (req.user.role !== 'admin') {
+        const userId = req.user._id;
+        const [assignedBoardIds, createdBoardIds] = await Promise.all([
+          Task.distinct('board', { assignedTo: userId }),
+          Board.distinct('_id', { createdBy: userId, archived: true })
+        ]);
+        const allIds = [...new Set([
+          ...assignedBoardIds.map(id => id.toString()),
+          ...createdBoardIds.map(id => id.toString())
+        ])];
+        query._id = { $in: allIds };
+      }
+
+      const boards = await Board.find(query)
+        .select('title description color createdAt updatedAt columns permissions.visibility')
         .sort({ createdAt: -1 })
         .lean();
       res.json(boards);
@@ -268,6 +284,13 @@ const boardController = {
         return res.status(403).json({ error: 'Only admins can modify board permissions' });
       }
 
+      // Get existing allowed users before updating, so we only notify new ones
+      const existingBoard = await Board.findById(req.params.boardId).select('permissions.allowedUsers').lean();
+      if (!existingBoard) return res.status(404).json({ error: 'Board not found' });
+      const previousAllowed = new Set(
+        (existingBoard.permissions?.allowedUsers || []).map(id => id.toString())
+      );
+
       const board = await Board.findByIdAndUpdate(req.params.boardId, {
         $set: {
           'permissions.visibility': visibility,
@@ -278,16 +301,18 @@ const boardController = {
         }
       }, { new: true });
 
-      if (!board) return res.status(404).json({ error: 'Board not found' });
-
+      // Only notify newly added users
       if (allowedUsers?.length) {
-        await notificationService.notifyMany(allowedUsers, {
-          sender: req.user._id,
-          type: 'board_shared',
-          title: 'Board Shared',
-          message: `You now have access to "${board.title}"`,
-          board: board._id
-        });
+        const newUsers = allowedUsers.filter(id => !previousAllowed.has(id.toString()));
+        if (newUsers.length) {
+          await notificationService.notifyMany(newUsers, {
+            sender: req.user._id,
+            type: 'board_shared',
+            title: 'Board Shared',
+            message: `You now have access to "${board.title}"`,
+            board: board._id
+          });
+        }
       }
 
       socketService.boardUpdated(board._id, { permissions: board.permissions }, req.user);

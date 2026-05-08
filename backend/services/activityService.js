@@ -4,7 +4,7 @@ const log = require('../utils/logger');
 const activityService = {
   async log({ board, task, user, action, target, changes, metadata, req }) {
     try {
-      const log = await ActivityLog.create({
+      const entry = await ActivityLog.create({
         board,
         task,
         user: user._id || user,
@@ -19,7 +19,7 @@ const activityService = {
       if (board) {
         try {
           const socketService = require('./socketService');
-          socketService.activityLogged(board.toString(), log);
+          socketService.activityLogged(board.toString(), entry);
         } catch {}
       }
     } catch (err) {

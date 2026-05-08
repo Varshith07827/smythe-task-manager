@@ -11,6 +11,7 @@ import Notifications from './pages/Notifications';
 import Profile from './pages/Profile';
 import Archived from './pages/Archived';
 import AdminLogs from './pages/AdminLogs';
+import WidgetView from './pages/WidgetView';
 import Layout from './components/Layout';
 
 function ProtectedRoute({ children }) {
@@ -36,6 +37,7 @@ export default function App() {
           <Route path="profile" element={<Profile />} />
           <Route path="archived" element={<Archived />} />
           <Route path="logs" element={<AdminLogs />} />
+          <Route path="widgets/:widgetId" element={<WidgetView />} />
         </Route>
       </Routes>
     </ConfirmProvider>
