@@ -35,6 +35,9 @@ export default function Layout() {
     sidebarHoverTimeout.current = setTimeout(() => setSidebarOpen(false), 200);
   }, []);
   useEffect(() => {
+    return () => clearTimeout(sidebarHoverTimeout.current);
+  }, []);
+  useEffect(() => {
     const handler = (e) => {
       if (profileRef.current && !profileRef.current.contains(e.target) &&
           (!profileDropdownRef.current || !profileDropdownRef.current.contains(e.target))) {

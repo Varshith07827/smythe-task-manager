@@ -1582,59 +1582,6 @@ textarea.form-input { resize: vertical; min-height: 80px; }
   padding: 0 !important;
 }
 
-/* Login layout — sidebar + main */
-.login-layout {
-  display: flex; min-height: 100vh;
-}
-.login-sidebar {
-  width: 220px; background: var(--sidebar-bg);
-  display: flex; flex-direction: column;
-  padding: 24px 0; flex-shrink: 0;
-}
-.login-sidebar-brand {
-  display: flex; align-items: center; gap: 10px;
-  padding: 0 20px; margin-bottom: 32px;
-  overflow: hidden; min-width: 0;
-}
-.login-sidebar-icon {
-  width: 36px; height: 36px; border-radius: 10px;
-  background: linear-gradient(135deg, var(--accent), #818cf8);
-  color: #fff; font-size: 18px; font-weight: 700;
-  display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0;
-}
-.login-sidebar-title {
-  font-size: 16px; font-weight: 700; color: var(--sidebar-text-bright);
-  letter-spacing: -0.02em;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  min-width: 0;
-}
-.login-sidebar-nav {
-  flex: 1; display: flex; flex-direction: column; gap: 2px; padding: 0 12px;
-}
-.login-sidebar-link {
-  display: flex; align-items: center; gap: 10px;
-  padding: 10px 12px; border-radius: var(--radius-sm);
-  color: var(--sidebar-text); text-decoration: none; font-size: 13px; font-weight: 500;
-  transition: all 0.15s;
-}
-.login-sidebar-link:hover {
-  background: var(--sidebar-hover); color: var(--sidebar-text-bright);
-}
-.login-sidebar-footer {
-  padding: 12px 20px; font-size: 10px; color: var(--sidebar-text); opacity: 0.4;
-}
-.login-main {
-  flex: 1; display: flex; flex-direction: column; background: var(--bg-primary);
-}
-.login-header {
-  display: flex; justify-content: flex-end; padding: 16px 24px;
-}
-.login-header-link {
-  font-size: 13px; color: var(--text-secondary); text-decoration: none; font-weight: 500;
-}
-.login-header-link:hover { color: var(--accent); }
-
 .login-center {
   flex: 1; display: flex; align-items: center; justify-content: center;
   padding: 32px 24px; width: 100%;
@@ -1642,8 +1589,6 @@ textarea.form-input { resize: vertical; min-height: 80px; }
 
 @media (max-width: 768px) {
   .auth-header-logo { max-height: 40px; max-width: 180px; }
-  .login-sidebar { display: none; }
-  .login-header { justify-content: center; }
   .login-center { padding: 24px 16px; }
 }
 

@@ -59,11 +59,13 @@ export default function BoardView() {
     try { return Number(localStorage.getItem('smythe:detailWidth')) || Math.round(window.innerWidth * 0.5); } catch { return Math.round(window.innerWidth * 0.5); }
   });
   const resizing = useRef(false);
+  const latestWidth = useRef(detailWidth);
+  useEffect(() => { latestWidth.current = detailWidth; }, [detailWidth]);
   const handleResizeStart = (e) => {
     e.preventDefault();
     resizing.current = true;
     const startX = e.clientX;
-    const startW = detailWidth;
+    const startW = latestWidth.current;
     const onMove = (ev) => {
       if (!resizing.current) return;
       const diff = startX - ev.clientX;
@@ -72,13 +74,16 @@ export default function BoardView() {
     };
     const onUp = () => {
       resizing.current = false;
-      localStorage.setItem('smythe:detailWidth', String(detailWidth));
+      localStorage.setItem('smythe:detailWidth', String(latestWidth.current));
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onUp);
     };
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp);
   };
+
+  const selectedTaskRef = useRef(selectedTask);
+  useEffect(() => { selectedTaskRef.current = selectedTask; }, [selectedTask]);
 
   const isManager = user?.role === 'admin';
 
@@ -151,14 +156,14 @@ export default function BoardView() {
         }
         return prev;
       });
-      if (selectedTask?._id === task._id) {
+      if (selectedTaskRef.current?._id === task._id) {
         if (!belongsInView(task)) setSelectedTask(null);
         else setSelectedTask(task);
       }
     };
     const onTaskDeleted = ({ taskId }) => {
       setTasks(prev => prev.filter(t => t._id !== taskId));
-      if (selectedTask?._id === taskId) setSelectedTask(null);
+      if (selectedTaskRef.current?._id === taskId) setSelectedTask(null);
     };
     const onBulkUpdated = ({ taskIds, changes }) => {
       setTasks(prev => {
@@ -183,7 +188,7 @@ export default function BoardView() {
       socket.off('tasks:bulk_updated', onBulkUpdated);
       socket.off('board:updated', onBoardUpdated);
     };
-  }, [socket, boardId, selectedTask, showArchived]);
+  }, [socket, boardId, showArchived]);
 
   const handleTaskCreated = (task) => {
     setTasks(prev => prev.some(t => t._id === task._id) ? prev : [...prev, task]);

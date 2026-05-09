@@ -206,7 +206,10 @@ const boardController = {
       const col = board.columns.id(req.params.colId);
       if (!col) return res.status(404).json({ error: 'Column not found' });
 
-      Object.assign(col, req.body);
+      const COLUMN_EDITABLE = ['name', 'type', 'options', 'required', 'defaultValue', 'order', 'width', 'visible', 'color'];
+      for (const key of COLUMN_EDITABLE) {
+        if (req.body[key] !== undefined) col[key] = req.body[key];
+      }
       await board.save();
 
       socketService.boardUpdated(board._id, { columns: board.columns }, req.user);

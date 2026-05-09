@@ -15,9 +15,11 @@ function sanitizeBody(text) {
   if (!text || typeof text !== 'string') return '';
   return text
     .replace(/<[^>]*>/g, '')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
     .trim();
+}
+
+function escapeRegex(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 const ticketController = {
@@ -98,7 +100,7 @@ const ticketController = {
         filter.status = status;
       }
       if (search?.trim()) {
-        filter.subject = { $regex: search.trim(), $options: 'i' };
+        filter.subject = { $regex: escapeRegex(search.trim().slice(0, 200)), $options: 'i' };
       }
 
       const skip = (Math.max(1, parseInt(page)) - 1) * Math.min(50, parseInt(limit) || 20);
@@ -145,7 +147,7 @@ const ticketController = {
       }
       if (search?.trim()) {
         filter.$or = [
-          { subject: { $regex: search.trim(), $options: 'i' } }
+          { subject: { $regex: escapeRegex(search.trim().slice(0, 200)), $options: 'i' } }
         ];
       }
 

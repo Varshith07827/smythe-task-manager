@@ -15,6 +15,32 @@ function sanitizeText(text, maxLen = 500) {
   return text.replace(/<[^>]*>/g, '').trim().slice(0, maxLen);
 }
 
+function userCanAccessBoard(board, userId, role) {
+  if (!board) return false;
+  if (role === 'admin') return true;
+  if (board.createdBy?.toString() === userId) return true;
+  const perms = board.permissions || {};
+  const visibility = perms.visibility || 'all';
+  if (visibility === 'all') return true;
+  if (visibility === 'restricted') {
+    return (perms.allowedUsers || []).some(id => id.toString() === userId);
+  }
+  return false;
+}
+
+async function canManageTaskShare(task, user) {
+  const userId = user._id.toString();
+  const role = user.role;
+  if (role === 'admin') return true;
+
+  const board = await Board.findById(task.board).select('createdBy permissions').lean();
+  if (!userCanAccessBoard(board, userId, role)) return false;
+  if (board?.createdBy?.toString() === userId) return true;
+
+  // For non-admin members, allow sharing only if they are assigned to the task.
+  return (task.assignedTo || []).some(id => id.toString() === userId);
+}
+
 const shareController = {
   // ===================== CREATE TASK SHARE LINK =====================
   async createTaskShareLink(req, res) {
@@ -22,8 +48,12 @@ const shareController = {
       const { taskId } = req.params;
       if (!isValidId(taskId)) return res.status(404).json({ error: 'Task not found' });
 
-      const task = await Task.findById(taskId).select('board title');
+      const task = await Task.findById(taskId).select('board title assignedTo');
       if (!task) return res.status(404).json({ error: 'Task not found' });
+
+      if (!await canManageTaskShare(task, req.user)) {
+        return res.status(403).json({ error: 'No permission to share this task' });
+      }
 
       const { permission = 'view', expiresIn } = req.body;
       if (!['view', 'edit'].includes(permission)) {
@@ -71,6 +101,13 @@ const shareController = {
       const { taskId } = req.params;
       if (!isValidId(taskId)) return res.status(404).json({ error: 'Task not found' });
 
+      const task = await Task.findById(taskId).select('board assignedTo');
+      if (!task) return res.status(404).json({ error: 'Task not found' });
+
+      if (!await canManageTaskShare(task, req.user)) {
+        return res.status(403).json({ error: 'No permission to view share details' });
+      }
+
       const share = await TaskShare.findOne({ task: taskId, revoked: false })
         .select('token permission expiresAt accessCount lastAccessedAt createdAt')
         .lean();
@@ -92,6 +129,13 @@ const shareController = {
     try {
       const { taskId } = req.params;
       if (!isValidId(taskId)) return res.status(404).json({ error: 'Task not found' });
+
+      const task = await Task.findById(taskId).select('board assignedTo');
+      if (!task) return res.status(404).json({ error: 'Task not found' });
+
+      if (!await canManageTaskShare(task, req.user)) {
+        return res.status(403).json({ error: 'No permission to revoke share link' });
+      }
 
       const result = await TaskShare.updateMany(
         { task: taskId, revoked: false },
@@ -162,6 +206,8 @@ const shareController = {
       if (!task || task.archived) return res.status(404).json({ error: 'Task not found' });
 
       const allowed = ['title', 'description', 'status', 'priority', 'dueDate', 'columnValues'];
+      const VALID_STATUSES = ['pending', 'in_progress', 'completed', 'blocked', 'cancelled'];
+      const VALID_PRIORITIES = ['low', 'medium', 'high', 'critical'];
       const updates = {};
 
       for (const key of allowed) {
@@ -172,6 +218,36 @@ const shareController = {
             updates[key] = clean;
           } else if (key === 'description') {
             updates[key] = sanitizeText(req.body[key], 5000);
+          } else if (key === 'status') {
+            // Also accept board custom statuses
+            const board = await Board.findById(task.board).select('customStatuses').lean();
+            const customVals = (board?.customStatuses || []).map(s => s.value);
+            const allValid = [...VALID_STATUSES, ...customVals];
+            if (!allValid.includes(req.body[key])) {
+              return res.status(400).json({ error: 'Invalid status value' });
+            }
+            updates[key] = req.body[key];
+          } else if (key === 'priority') {
+            const board = await Board.findById(task.board).select('customPriorities').lean();
+            const customVals = (board?.customPriorities || []).map(p => p.value);
+            const allValid = [...VALID_PRIORITIES, ...customVals];
+            if (!allValid.includes(req.body[key])) {
+              return res.status(400).json({ error: 'Invalid priority value' });
+            }
+            updates[key] = req.body[key];
+          } else if (key === 'dueDate') {
+            if (req.body[key] !== null) {
+              const d = new Date(req.body[key]);
+              if (isNaN(d.getTime())) return res.status(400).json({ error: 'Invalid date' });
+              updates[key] = d;
+            } else {
+              updates[key] = null;
+            }
+          } else if (key === 'columnValues') {
+            if (typeof req.body[key] !== 'object' || Array.isArray(req.body[key])) {
+              return res.status(400).json({ error: 'columnValues must be an object' });
+            }
+            updates[key] = req.body[key];
           } else {
             updates[key] = req.body[key];
           }

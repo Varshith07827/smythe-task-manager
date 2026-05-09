@@ -23,13 +23,20 @@ function ProtectedRoute({ children }) {
   return children;
 }
 
+function GuestRoute({ children }) {
+  const { user, loading } = useAuth();
+  if (loading) return <div className="loading-spinner"><div className="spinner" /></div>;
+  if (user) return <Navigate to="/" />;
+  return children;
+}
+
 export default function App() {
   return (
     <ConfirmProvider>
       <ToastContainer />
       <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
+        <Route path="/login" element={<GuestRoute><Login /></GuestRoute>} />
+        <Route path="/register" element={<GuestRoute><Register /></GuestRoute>} />
         <Route path="/share/:token" element={<PublicTask />} />
         <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
           <Route index element={<Dashboard />} />

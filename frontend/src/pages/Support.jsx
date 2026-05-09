@@ -59,6 +59,8 @@ export default function Support() {
   const [sending, setSending] = useState(false);
   const messagesEndRef = useRef(null);
   const replyInputRef = useRef(null);
+  const selectedTicketRef = useRef(selectedTicket);
+  useEffect(() => { selectedTicketRef.current = selectedTicket; }, [selectedTicket]);
 
   const loadTickets = useCallback(async () => {
     try {
@@ -83,18 +85,18 @@ export default function Support() {
   useEffect(() => {
     if (!socket) return;
     const handleTicketUpdate = (data) => {
-      if (data.type === 'ticket:reply' && selectedTicket?._id === data.ticketId) {
+      if (data.type === 'ticket:reply' && selectedTicketRef.current?._id === data.ticketId) {
         setMessages(prev => [...prev, data.message]);
         setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
       }
-      if (data.type === 'ticket:status' && selectedTicket?._id === data.ticketId) {
+      if (data.type === 'ticket:status' && selectedTicketRef.current?._id === data.ticketId) {
         setSelectedTicket(prev => prev ? { ...prev, status: data.status } : null);
       }
       loadTickets();
     };
     socket.on('notification:new', handleTicketUpdate);
     return () => socket.off('notification:new', handleTicketUpdate);
-  }, [socket, selectedTicket, loadTickets]);
+  }, [socket, loadTickets]);
 
   const openTicket = async (ticket) => {
     setSelectedTicket(ticket);

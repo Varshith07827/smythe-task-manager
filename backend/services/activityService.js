@@ -60,9 +60,12 @@ const activityService = {
       .lean();
   },
 
-  async getTaskActivity(taskId) {
+  async getTaskActivity(taskId, { page = 1, limit = 100 } = {}) {
+    const safeLimit = Math.min(limit, 200);
     return ActivityLog.find({ task: taskId })
       .sort({ createdAt: -1 })
+      .skip((page - 1) * safeLimit)
+      .limit(safeLimit)
       .populate('user', 'name avatar')
       .lean();
   },
@@ -80,8 +83,9 @@ const activityService = {
       ];
     }
     if (userName) {
+      const escapedName = userName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').slice(0, 200);
       const matchingUsers = await User.find({
-        name: { $regex: userName, $options: 'i' }
+        name: { $regex: escapedName, $options: 'i' }
       }).select('_id').lean();
       const userIds = matchingUsers.map(u => u._id);
       query.user = { $in: userIds };

@@ -10,13 +10,18 @@ const { v4: uuidv4 } = require('uuid');
 const AVATAR_DIR = path.join(__dirname, '..', 'uploads', 'avatars');
 if (!fs.existsSync(AVATAR_DIR)) fs.mkdirSync(AVATAR_DIR, { recursive: true });
 
+const ALLOWED_AVATAR_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+
 const avatarUpload = multer({
   storage: multer.diskStorage({
     destination: (req, file, cb) => cb(null, AVATAR_DIR),
     filename: (req, file, cb) => cb(null, `${uuidv4()}${path.extname(file.originalname)}`)
   }),
   limits: { fileSize: 2 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => cb(null, file.mimetype.startsWith('image/'))
+  fileFilter: (req, file, cb) => {
+    if (ALLOWED_AVATAR_TYPES.has(file.mimetype)) return cb(null, true);
+    cb(new Error('Unsupported avatar format. Use JPG, PNG, WEBP, or GIF.'));
+  }
 });
 
 router.get('/', authenticate, authorize('admin'), userController.getOrgMembers);

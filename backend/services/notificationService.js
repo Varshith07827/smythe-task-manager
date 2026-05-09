@@ -90,7 +90,7 @@ const notificationService = {
     }
   },
 
-  async sendProgressDigest({ recipientId, boardId, boardTitle, tasks }) {
+  async sendProgressDigest({ recipientId, boardId, boardTitle, tasks, intervalHours = 4 }) {
     const User = require('../models/User');
     const user = await User.findById(recipientId);
     if (!user) return null;
@@ -107,7 +107,8 @@ const notificationService = {
     const branding = await emailService.getAppBranding();
     const emailHtml = emailService.buildProgressDigestEmail(boardTitle, tasks, branding);
 
-    const windowIndex = Math.floor(Date.now() / (4 * 3600000));
+    const safeIntervalHours = Math.min(24, Math.max(1, Number(intervalHours) || 4));
+    const windowIndex = Math.floor(Date.now() / (safeIntervalHours * 3600000));
     const groupKey = `progress-digest:${boardId}:${recipientId}:w${windowIndex}`;
 
     const existing = await Notification.findOne({ groupKey }).lean();

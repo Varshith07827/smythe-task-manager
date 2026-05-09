@@ -26,7 +26,7 @@ async function runProgressDigestTick() {
       'progressDigest.enabled': true,
       archived: { $ne: true }
     })
-      .select('title')
+      .select('title progressDigest.intervalHours')
       .lean();
 
     for (const board of boards) {
@@ -56,7 +56,8 @@ async function runProgressDigestTick() {
           recipientId: userId,
           boardId: board._id,
           boardTitle: board.title,
-          tasks: userTasks
+          tasks: userTasks,
+          intervalHours: board.progressDigest?.intervalHours || 4
         });
       }
     }
