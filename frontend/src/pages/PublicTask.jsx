@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { sharesApi } from '../api/shares';
 import { useBranding } from '../context/BrandingContext';
+import { alert } from '../components/AlertSystem';
 import { motion } from 'framer-motion';
 import { format } from 'date-fns';
 
@@ -34,8 +35,20 @@ export default function PublicTask() {
   // Comment state
   const [commentText, setCommentText] = useState('');
   const [addingComment, setAddingComment] = useState(false);
+  const [uploadingFiles, setUploadingFiles] = useState(false);
+  const fileRef = useRef(null);
 
   const canEdit = permission === 'edit';
+  const customStatuses = board?.customStatuses || [];
+  const customPriorities = board?.customPriorities || [];
+  const statusOptions = useMemo(
+    () => [...new Set([...Object.keys(STATUS_COLORS), ...customStatuses.map(s => s.value), task?.status].filter(Boolean))],
+    [customStatuses, task?.status]
+  );
+  const priorityOptions = useMemo(
+    () => [...new Set([...Object.keys(PRIORITY_COLORS), ...customPriorities.map(p => p.value), task?.priority].filter(Boolean))],
+    [customPriorities, task?.priority]
+  );
 
   useEffect(() => {
     loadTask();
@@ -80,6 +93,24 @@ export default function PublicTask() {
       setCommentText('');
     } catch {} finally {
       setAddingComment(false);
+    }
+  };
+
+  const handleUploadAttachments = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    setUploadingFiles(true);
+    try {
+      for (const file of files) {
+        const res = await sharesApi.publicUploadAttachment(token, file);
+        setTask(prev => ({ ...prev, attachments: [...(prev.attachments || []), res.data] }));
+      }
+      alert.success(`${files.length} file${files.length > 1 ? 's' : ''} uploaded`);
+    } catch (err) {
+      alert.error(err.response?.data?.error || 'Could not upload file');
+    } finally {
+      setUploadingFiles(false);
+      e.target.value = '';
     }
   };
 
@@ -154,8 +185,8 @@ export default function PublicTask() {
                   onChange={e => handleSave('status', e.target.value)}
                   style={{ border: 'none', background: 'none', padding: 0, fontSize: 13 }}
                 >
-                  {Object.keys(STATUS_COLORS).map(s => (
-                    <option key={s} value={s}>{s.replace('_', ' ')}</option>
+                  {statusOptions.map(s => (
+                    <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>
                   ))}
                 </select>
               ) : (
@@ -173,7 +204,7 @@ export default function PublicTask() {
                   onChange={e => handleSave('priority', e.target.value)}
                   style={{ border: 'none', background: 'none', padding: 0, fontSize: 13 }}
                 >
-                  {Object.keys(PRIORITY_COLORS).map(p => (
+                  {priorityOptions.map(p => (
                     <option key={p} value={p}>{p}</option>
                   ))}
                 </select>
@@ -222,6 +253,93 @@ export default function PublicTask() {
               >
                 {task.description || (canEdit ? 'Click to add description...' : 'No description')}
               </div>
+            )}
+          </div>
+
+          {/* Attachments */}
+          <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: 20, marginBottom: 20 }}>
+            <h3 style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 12 }}>
+              Files {task.attachments?.length > 0 && `(${task.attachments.length})`}
+            </h3>
+            {canEdit && (
+              <div
+                className="upload-area"
+                style={{ marginBottom: 14 }}
+                onClick={() => fileRef.current?.click()}
+              >
+                <input
+                  ref={fileRef}
+                  type="file"
+                  multiple
+                  accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv"
+                  onChange={handleUploadAttachments}
+                  style={{ display: 'none' }}
+                />
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" strokeWidth="1.5" strokeLinecap="round">
+                  <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+                  <polyline points="17 8 12 3 7 8" />
+                  <line x1="12" y1="3" x2="12" y2="15" />
+                </svg>
+                <p style={{ fontSize: 13, fontWeight: 500, margin: '6px 0 2px' }}>
+                  {uploadingFiles ? 'Uploading...' : 'Click to upload files'}
+                </p>
+                <p style={{ fontSize: 11, color: 'var(--text-tertiary)', margin: 0 }}>
+                  Images, PDFs, Office docs, TXT/CSV (max 25MB each)
+                </p>
+              </div>
+            )}
+
+            {task.attachments?.length > 0 ? (
+              <div className="attachments-grid">
+                {task.attachments.map(att => {
+                  const ext = att.filename?.split('.').pop()?.toLowerCase();
+                  const isImage = att.mimeType?.startsWith('image/');
+                  const tokenParam = encodeURIComponent(token);
+                  const viewHref = `/api/shares/public/${tokenParam}/attachments/${att._id}/view`;
+                  const downloadHref = `/api/shares/public/${tokenParam}/attachments/${att._id}/download`;
+                  return (
+                    <div key={att._id} className="attachment-card">
+                      {isImage ? (
+                        <a className="attachment-thumb" href={viewHref} target="_blank" rel="noreferrer">
+                          <img src={viewHref} alt={att.filename} />
+                        </a>
+                      ) : (
+                        <div className="attachment-thumb attachment-thumb-file">
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" strokeWidth="1.5" strokeLinecap="round">
+                            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                            <polyline points="14 2 14 8 20 8" />
+                          </svg>
+                          <span style={{ fontSize: 8, textTransform: 'uppercase', fontWeight: 600, color: 'var(--accent)' }}>{ext}</span>
+                        </div>
+                      )}
+                      <div className="attachment-info">
+                        <span className="attachment-name">{att.filename}</span>
+                        <span className="attachment-meta">
+                          {att.size ? `${(att.size / 1024).toFixed(0)} KB` : ''}
+                          {att.uploadedBy?.name ? ` · ${att.uploadedBy.name}` : ''}
+                        </span>
+                      </div>
+                      <div className="attachment-actions">
+                        <a className="attachment-open" href={viewHref} target="_blank" rel="noreferrer" title="Open">
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                            <circle cx="12" cy="12" r="3" />
+                          </svg>
+                        </a>
+                        <a className="attachment-open" href={downloadHref} title="Download">
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+                            <polyline points="7 10 12 15 17 10" />
+                            <line x1="12" y1="15" x2="12" y2="3" />
+                          </svg>
+                        </a>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p style={{ fontSize: 13, color: 'var(--text-tertiary)', fontStyle: 'italic', margin: 0 }}>No files attached yet.</p>
             )}
           </div>
 

@@ -10,5 +10,12 @@ export const sharesApi = {
   // Public (no auth needed — uses raw axios to avoid auth interceptor redirect)
   getPublicTask: (token) => axios.get(`/api/shares/public/${token}`),
   publicUpdateTask: (token, data) => axios.patch(`/api/shares/public/${token}`, data),
-  publicAddComment: (token, data) => axios.post(`/api/shares/public/${token}/comments`, data)
+  publicAddComment: (token, data) => axios.post(`/api/shares/public/${token}/comments`, data),
+  publicUploadAttachment: (token, file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return axios.post(`/api/shares/public/${token}/attachments`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  }
 };

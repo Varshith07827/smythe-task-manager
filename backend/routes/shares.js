@@ -2,6 +2,7 @@ const router = require('express').Router();
 const shareController = require('../controllers/shareController');
 const { authenticate } = require('../middleware/auth');
 const rateLimit = require('express-rate-limit');
+const { upload } = require('../services/uploadService');
 
 const publicLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -28,5 +29,8 @@ router.delete('/tasks/:taskId/share', authenticate, shareController.revokeTaskSh
 router.get('/public/:token', publicLimiter, shareController.getPublicTask);
 router.patch('/public/:token', publicWriteLimiter, shareController.publicUpdateTask);
 router.post('/public/:token/comments', publicWriteLimiter, shareController.publicAddComment);
+router.post('/public/:token/attachments', publicWriteLimiter, shareController.preparePublicAttachmentUpload, upload.single('file'), shareController.publicUploadAttachment);
+router.get('/public/:token/attachments/:attachmentId/view', publicLimiter, shareController.publicViewAttachment);
+router.get('/public/:token/attachments/:attachmentId/download', publicLimiter, shareController.publicDownloadAttachment);
 
 module.exports = router;

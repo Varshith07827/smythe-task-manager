@@ -2,8 +2,11 @@ const mongoose = require('mongoose');
 const TaskShare = require('../models/TaskShare');
 const Task = require('../models/Task');
 const Board = require('../models/Board');
+const Attachment = require('../models/Attachment');
 const socketService = require('../services/socketService');
 const activityService = require('../services/activityService');
+const notificationService = require('../services/notificationService');
+const { uploadService } = require('../services/uploadService');
 const log = require('../utils/logger');
 
 function isValidId(id) {
@@ -39,6 +42,41 @@ async function canManageTaskShare(task, user) {
 
   // For non-admin members, allow sharing only if they are assigned to the task.
   return (task.assignedTo || []).some(id => id.toString() === userId);
+}
+
+async function getActiveShareByToken(token) {
+  if (!token || token.length !== 64) return null;
+  const share = await TaskShare.findOne({ token });
+  if (!share || !share.isActive()) return null;
+  return share;
+}
+
+function formatActorLabel(share) {
+  return `Public link (${String(share.createdBy || '').slice(-6)})`;
+}
+
+async function notifyPublicShareActivity(task, share, type, title, message, extra = {}) {
+  const actorId = share.createdBy?.toString();
+  const recipients = new Set();
+  for (const uid of task.assignedTo || []) {
+    const id = uid.toString();
+    if (id !== actorId) recipients.add(id);
+  }
+  if (task.assignedBy && task.assignedBy.toString() !== actorId) {
+    recipients.add(task.assignedBy.toString());
+  }
+  for (const rid of recipients) {
+    await notificationService.create({
+      recipient: rid,
+      sender: share.createdBy,
+      type,
+      title,
+      message,
+      board: task.board,
+      task: task._id,
+      ...extra
+    });
+  }
 }
 
 const shareController = {
@@ -165,13 +203,17 @@ const shareController = {
         .populate('assignedTo', 'name avatar')
         .populate('assignedBy', 'name')
         .populate('comments.author', 'name avatar')
+        .populate({
+          path: 'attachments',
+          populate: { path: 'uploadedBy', select: 'name avatar' }
+        })
         .lean();
 
       if (!task || task.archived) {
         return res.status(404).json({ error: 'Task not found or archived' });
       }
 
-      const board = await Board.findById(task.board).select('title columns').lean();
+      const board = await Board.findById(task.board).select('title columns customStatuses customPriorities').lean();
 
       // Update access count
       TaskShare.updateOne(
@@ -181,7 +223,12 @@ const shareController = {
 
       res.json({
         task,
-        board: board ? { title: board.title, columns: board.columns } : null,
+        board: board ? {
+          title: board.title,
+          columns: board.columns,
+          customStatuses: board.customStatuses || [],
+          customPriorities: board.customPriorities || []
+        } : null,
         permission: share.permission,
         shareId: share._id
       });
@@ -204,6 +251,7 @@ const shareController = {
 
       const task = await Task.findById(share.task);
       if (!task || task.archived) return res.status(404).json({ error: 'Task not found' });
+      const previousStatus = task.status;
 
       const allowed = ['title', 'description', 'status', 'priority', 'dueDate', 'columnValues'];
       const VALID_STATUSES = ['pending', 'in_progress', 'completed', 'blocked', 'cancelled'];
@@ -267,6 +315,29 @@ const shareController = {
         socketService.taskUpdated(task.board.toString(), populated, 'public');
       } catch {}
 
+      const actorLabel = formatActorLabel(share);
+      if (updates.status && updates.status !== previousStatus) {
+        await notifyPublicShareActivity(
+          task,
+          share,
+          'status_changed',
+          'Task status updated',
+          `${actorLabel} changed "${task.title}" from ${String(previousStatus).replace(/_/g, ' ')} to ${String(updates.status).replace(/_/g, ' ')}`,
+          { newStatus: updates.status }
+        );
+      } else {
+        const changedFields = Object.keys(updates);
+        if (changedFields.length > 0) {
+          await notifyPublicShareActivity(
+            task,
+            share,
+            'task_updated',
+            'Task updated via shared link',
+            `${actorLabel} updated "${task.title}" (${changedFields.join(', ')})`
+          );
+        }
+      }
+
       res.json(populated);
     } catch (err) {
       log.error('Share', `Public task update failed: ${err.message}`);
@@ -302,10 +373,126 @@ const shareController = {
         .populate('comments.author', 'name avatar')
         .lean();
 
+      await notifyPublicShareActivity(
+        task,
+        share,
+        'comment_added',
+        'Comment added via shared link',
+        `${formatActorLabel(share)} commented on "${task.title}"`
+      );
+
       res.status(201).json(populated.comments[populated.comments.length - 1]);
     } catch (err) {
       log.error('Share', `Public comment failed: ${err.message}`);
       res.status(500).json({ error: 'Failed to add comment' });
+    }
+  },
+
+  async preparePublicAttachmentUpload(req, res, next) {
+    try {
+      const share = await getActiveShareByToken(req.params.token);
+      if (!share || share.permission !== 'edit') {
+        return res.status(403).json({ error: 'Edit access not available' });
+      }
+      req.share = share;
+      req.params.taskId = share.task.toString();
+      next();
+    } catch {
+      res.status(500).json({ error: 'Failed to prepare attachment upload' });
+    }
+  },
+
+  async publicUploadAttachment(req, res) {
+    try {
+      const share = req.share || await getActiveShareByToken(req.params.token);
+      if (!share || share.permission !== 'edit') {
+        return res.status(403).json({ error: 'Edit access not available' });
+      }
+      if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+
+      const task = await Task.findById(share.task);
+      if (!task || task.archived) return res.status(404).json({ error: 'Task not found' });
+
+      const attachment = await Attachment.create({
+        task: task._id,
+        board: task.board,
+        uploadedBy: share.createdBy,
+        filename: req.file.originalname,
+        storageKey: `${task._id.toString()}/${req.file.filename}`,
+        mimeType: req.file.mimetype,
+        size: req.file.size
+      });
+
+      await Task.findByIdAndUpdate(task._id, {
+        $push: {
+          attachments: attachment._id,
+          history: {
+            changedBy: share.createdBy,
+            action: 'attachment_added',
+            field: 'attachments',
+            newValue: attachment.filename,
+            timestamp: new Date(),
+            metadata: { source: 'public_share' }
+          }
+        }
+      });
+
+      const populated = await Attachment.findById(attachment._id)
+        .populate('uploadedBy', 'name avatar')
+        .lean();
+
+      try {
+        const refreshed = await Task.findById(task._id)
+          .populate('assignedTo', 'name avatar')
+          .populate('assignedBy', 'name')
+          .populate('comments.author', 'name avatar')
+          .populate({
+            path: 'attachments',
+            populate: { path: 'uploadedBy', select: 'name avatar' }
+          })
+          .lean();
+        socketService.taskUpdated(task.board.toString(), refreshed, 'public');
+      } catch {}
+
+      await notifyPublicShareActivity(
+        task,
+        share,
+        'task_updated',
+        'Attachment added via shared link',
+        `${formatActorLabel(share)} added "${attachment.filename}" to "${task.title}"`
+      );
+
+      res.status(201).json(populated);
+    } catch (err) {
+      log.error('Share', `Public attachment upload failed: ${err.message}`);
+      res.status(500).json({ error: 'Failed to upload attachment' });
+    }
+  },
+
+  async publicViewAttachment(req, res) {
+    try {
+      const share = await getActiveShareByToken(req.params.token);
+      if (!share) return res.status(404).json({ error: 'Invalid share link' });
+      const attachment = await Attachment.findOne({ _id: req.params.attachmentId, task: share.task });
+      if (!attachment) return res.status(404).json({ error: 'Attachment not found' });
+      const filePath = uploadService.getFilePath(attachment.storageKey);
+      res.setHeader('Content-Type', attachment.mimeType);
+      res.sendFile(filePath);
+    } catch (err) {
+      res.status(500).json({ error: 'Failed to load attachment' });
+    }
+  },
+
+  async publicDownloadAttachment(req, res) {
+    try {
+      const share = await getActiveShareByToken(req.params.token);
+      if (!share) return res.status(404).json({ error: 'Invalid share link' });
+      const attachment = await Attachment.findOne({ _id: req.params.attachmentId, task: share.task });
+      if (!attachment) return res.status(404).json({ error: 'Attachment not found' });
+      const filePath = uploadService.getFilePath(attachment.storageKey);
+      res.download(filePath, attachment.filename);
+    } catch (err) {
+      res.status(500).json({ error: 'Failed to download attachment' });
     }
   }
 };
