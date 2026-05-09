@@ -81,7 +81,7 @@ const notificationService = {
 
   async _sendEmailNotification(user, { title, message, type, taskTitle, emailHtml }) {
     const branding = await emailService.getAppBranding();
-    const appName = branding.appTitle || 'Smythe';
+    const appName = branding.appTitle || 'TaskIT';
     const htmlBody = emailHtml || emailService.buildNotificationEmail(title, message, type, branding);
     const emailSubject = taskTitle ? `${appName} - ${taskTitle}: ${title}` : `${appName} - ${title}`;
     const result = await emailService.send(user.email, emailSubject, htmlBody);

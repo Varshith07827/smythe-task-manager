@@ -8,6 +8,7 @@ import { format, formatDistanceToNow } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
 import { alert } from './AlertSystem';
 import DocumentPreview from './DocumentPreview';
+import ShareModal from './ShareModal';
 import { authUrl } from '../utils/authUrl';
 
 const DEFAULT_STATUSES = {
@@ -114,6 +115,9 @@ export default function TaskDetail({ task: initialTask, board, boardId, onClose,
   /* per-task notifications */
   const [notifSettings, setNotifSettings] = useState(null);
   const [savingNotif, setSavingNotif] = useState(false);
+
+  /* share modal */
+  const [showShareModal, setShowShareModal] = useState(false);
 
   const isManager = user?.role === 'admin';
 
@@ -334,7 +338,7 @@ export default function TaskDetail({ task: initialTask, board, boardId, onClose,
   const tabs = [
     { key: 'details', label: 'Details' },
     { key: 'attachments', label: `Files${attachments.length > 0 ? ` (${attachments.length})` : ''}` },
-    ...(isManager && notifSettings ? [{ key: 'notifications', label: 'Notifications' }] : []),
+    ...(notifSettings ? [{ key: 'notifications', label: 'Notifications' }] : []),
     { key: 'logs', label: 'Logs' },
   ];
 
@@ -360,17 +364,24 @@ export default function TaskDetail({ task: initialTask, board, boardId, onClose,
           <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>{task.title}</h3>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-          {isManager && (
-            <button
-              className="btn btn-ghost btn-xs"
-              onClick={() => setShowRemindModal(true)}
-              title="Send reminder"
-              style={{ color: 'var(--orange)', fontSize: 12, fontWeight: 600 }}
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 01-3.46 0" /></svg>
-              Remind
-            </button>
-          )}
+          <button
+            className="btn btn-ghost btn-xs"
+            onClick={() => setShowShareModal(true)}
+            title="Share task"
+            style={{ fontSize: 12, fontWeight: 600 }}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" /></svg>
+            Share
+          </button>
+          <button
+            className="btn btn-ghost btn-xs"
+            onClick={() => setShowRemindModal(true)}
+            title="Send reminder"
+            style={{ color: 'var(--orange)', fontSize: 12, fontWeight: 600 }}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 01-3.46 0" /></svg>
+            Remind
+          </button>
           <button className="modal-close" onClick={onClose} style={{ width: 28, height: 28 }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
           </button>
@@ -769,7 +780,7 @@ export default function TaskDetail({ task: initialTask, board, boardId, onClose,
         )}
 
         {/* ═══ NOTIFICATIONS TAB ═══ */}
-        {activeTab === 'notifications' && isManager && notifSettings && (
+        {activeTab === 'notifications' && notifSettings && (
           <div>
             <SubSection title="Reminders" defaultOpen>
               {/* Interval reminder */}
@@ -990,6 +1001,14 @@ export default function TaskDetail({ task: initialTask, board, boardId, onClose,
       <AnimatePresence>
         {previewAtt && <DocumentPreview attachment={previewAtt} onClose={() => setPreviewAtt(null)} />}
       </AnimatePresence>
+
+      {showShareModal && (
+        <ShareModal
+          taskId={task._id}
+          taskTitle={task.title}
+          onClose={() => setShowShareModal(false)}
+        />
+      )}
     </motion.div>
   );
 }

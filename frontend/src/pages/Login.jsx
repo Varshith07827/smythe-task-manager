@@ -68,7 +68,7 @@ export default function Login() {
   const { login, loginWithToken } = useAuth();
   const branding = useBranding();
   const navigate = useNavigate();
-  const appName = branding.appTitle || 'Smythe';
+  const appName = branding.appTitle || 'TaskIT';
 
   const handlePasswordLogin = async (e) => {
     e.preventDefault();

@@ -57,7 +57,7 @@ const authController = {
       otpStore.set(normalizedEmail, { code, expires: Date.now() + OTP_EXPIRY_MS, attempts: 0 });
 
       const branding = await emailService.getAppBranding();
-      const appName = branding.appTitle || 'Smythe';
+      const appName = branding.appTitle || 'TaskIT';
       const html = emailService.buildNotificationEmail(
         'Your login code',
         `Your one-time login code is:\n\n${code}\n\nThis code expires in 10 minutes.`,
@@ -218,7 +218,7 @@ const authController = {
       pendingRegistrations.delete(normalizedEmail);
 
       const branding = await emailService.getAppBranding();
-      const appName = branding.appTitle || 'Smythe';
+      const appName = branding.appTitle || 'TaskIT';
       const welcomeHtml = emailService.buildNotificationEmail(
         `Welcome to ${appName}!`,
         `Dear ${pending.name},\n\nThank you for joining ${appName}.\n\nPlease use the following details to login, and change your password after first login.\n\nEmail: ${pending.email}\nPassword: ${tempPassword}`,
@@ -336,7 +336,7 @@ const authController = {
       }
 
       const branding = await emailService.getAppBranding();
-      const appName = branding.appTitle || 'Smythe';
+      const appName = branding.appTitle || 'TaskIT';
       const appUrl = process.env.APP_PUBLIC_URL || process.env.CLIENT_URL || 'http://localhost:5173';
       const html = emailService.buildNotificationEmail(
         `You've been invited to ${appName}`,
@@ -375,7 +375,7 @@ const authController = {
 
       if (admins.length) {
         const branding = await emailService.getAppBranding();
-        const appName = branding.appTitle || 'Smythe';
+        const appName = branding.appTitle || 'TaskIT';
         const timestamp = new Date().toISOString();
 
         const senderName = user ? user.name : normalizedEmail;

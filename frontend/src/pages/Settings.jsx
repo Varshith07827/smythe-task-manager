@@ -10,6 +10,67 @@ import { useBranding } from '../context/BrandingContext';
 import { motion } from 'framer-motion';
 import { alert } from '../components/AlertSystem';
 
+function NotifToggle({ checked, onChange, disabled }) {
+  return (
+    <button type="button" role="switch" aria-checked={checked} disabled={disabled} onClick={() => onChange(!checked)}
+      style={{ width: 40, height: 22, borderRadius: 11, border: 'none', background: checked ? 'var(--accent)' : 'var(--border)', cursor: disabled ? 'not-allowed' : 'pointer', position: 'relative', transition: 'background 0.2s', flexShrink: 0, opacity: disabled ? 0.5 : 1, padding: 0 }}>
+      <span style={{ position: 'absolute', top: 2, left: checked ? 20 : 2, width: 18, height: 18, borderRadius: '50%', background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.25)' }} />
+    </button>
+  );
+}
+
+function NotificationPrefsTab({ user, setUser }) {
+  const [prefs, setPrefs] = useState(() => normalizeNotificationPrefs(user?.notificationPreferences));
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => { setPrefs(normalizeNotificationPrefs(user?.notificationPreferences)); }, [user]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const { data } = await usersApi.updateNotificationPrefs(normalizeNotificationPrefs(prefs));
+      setUser(u => {
+        if (!u) return u;
+        const next = { ...u, notificationPreferences: data };
+        localStorage.setItem('user', JSON.stringify(next));
+        return next;
+      });
+      alert.success('Notification preferences saved');
+    } catch { alert.error('Could not save preferences'); } finally { setSaving(false); }
+  };
+
+  const rows = [
+    { key: 'inApp', label: 'In-app notifications', desc: 'Show alerts inside the app' },
+    { key: 'email', label: 'Email notifications', desc: 'Send alerts to your email' },
+    { key: 'taskAssigned', label: 'Task assigned to me', desc: null },
+    { key: 'taskUpdated', label: 'Task updates', desc: 'Comments and changes on tasks you\'re involved with' },
+    { key: 'deadlineReminder', label: 'Deadline reminders', desc: null },
+    { key: 'mentions', label: 'Mentions', desc: 'When someone mentions you in a comment' },
+    { key: 'progressDigest', label: 'Progress digest', desc: 'Periodic summary of board activity' },
+  ];
+
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }}>
+      <CollapsibleCard title="My notification preferences" defaultOpen>
+        {rows.map(({ key, label, desc }) => (
+          <div key={key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '12px 0', borderBottom: '1px solid var(--separator)' }}>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)' }}>{label}</div>
+              {desc && <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 2 }}>{desc}</div>}
+            </div>
+            <NotifToggle checked={prefs[key] !== false} onChange={v => setPrefs(p => ({ ...p, [key]: v }))} />
+          </div>
+        ))}
+        <div style={{ paddingTop: 16, paddingBottom: 8 }}>
+          <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
+            {saving ? 'Saving...' : 'Save preferences'}
+          </button>
+        </div>
+      </CollapsibleCard>
+    </motion.div>
+  );
+}
+
 const colorTones = {
   warm: [
     { color: '#ef4444', label: 'Red' }, { color: '#f97316', label: 'Orange' },
@@ -56,7 +117,7 @@ export default function Settings() {
     return user?.role === 'admin' ? 'users' : 'notifications';
   });
   const [savingMemberNotifyId, setSavingMemberNotifyId] = useState(null);
-  const [branding, setBranding] = useState({ appTitle: 'Smythe', tagline: '', logoUrl: '', logoShape: 'rounded', accentColor: '#0a84ff', logoSize: 48, headerLogoUrl: '', headerLogoHeight: 36, headerLogoScale: 1, faviconUrl: '', siteTitle: '', sidebarColor: '#1a1a2e', useSameLogo: true, showLogoInHeader: true, showLogoInSidebar: true, showFaviconInSidebar: true, showNameInHeader: true });
+  const [branding, setBranding] = useState({ appTitle: 'TaskIT', tagline: 'Smart Task Management', logoUrl: '', logoShape: 'rounded', accentColor: '#0a84ff', logoSize: 48, headerLogoUrl: '', headerLogoHeight: 36, headerLogoScale: 1, faviconUrl: '', siteTitle: '', sidebarColor: '#1a1a2e', useSameLogo: true, showLogoInHeader: true, showLogoInSidebar: true, showFaviconInSidebar: true, showNameInHeader: true });
   const [allowSignup, setAllowSignup] = useState(false);
   const [brandingLoading, setBrandingLoading] = useState(false);
   const [showLogoPreview, setShowLogoPreview] = useState(false);
@@ -399,16 +460,7 @@ export default function Settings() {
       )}
 
       {activeTab === 'notifications' && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }}>
-          <CollapsibleCard title="Notification preferences">
-            <p style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: 16 }}>
-              Manage what you get notified about on the Notifications page.
-            </p>
-            <button className="btn btn-secondary" onClick={() => navigate('/notifications')}>
-              Go to Notifications
-            </button>
-          </CollapsibleCard>
-        </motion.div>
+        <NotificationPrefsTab user={user} setUser={setUser} />
       )}
 
       {confirmRemove && (
@@ -697,7 +749,7 @@ export default function Settings() {
               <div style={{ display: 'grid', gap: 16 }}>
                 <div className="form-group" style={{ marginBottom: 0 }}>
                   <label className="form-label">App Title</label>
-                  <input type="text" className="form-input" value={branding.appTitle} onChange={e => setBranding(b => ({ ...b, appTitle: e.target.value }))} placeholder="Smythe" />
+                  <input type="text" className="form-input" value={branding.appTitle} onChange={e => setBranding(b => ({ ...b, appTitle: e.target.value }))} placeholder="TaskIT" />
                 </div>
                 <div className="form-group" style={{ marginBottom: 0 }}>
                   <label className="form-label">Site Title <span style={{ fontWeight: 400, color: 'var(--text-tertiary)' }}>(Browser Tab)</span></label>

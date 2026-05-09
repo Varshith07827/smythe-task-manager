@@ -48,7 +48,7 @@ export default function Register() {
 
   const branding = useBranding();
   const navigate = useNavigate();
-  const appName = branding.appTitle || 'Smythe';
+  const appName = branding.appTitle || 'TaskIT';
 
   const handleRequestCode = async (e) => {
     e.preventDefault();

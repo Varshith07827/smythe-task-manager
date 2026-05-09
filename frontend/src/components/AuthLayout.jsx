@@ -9,7 +9,7 @@ import { useBranding } from '../context/BrandingContext';
  */
 export default function AuthLayout({ navLinks = [], onSupport, children }) {
   const branding = useBranding();
-  const appName = branding.appTitle || 'Smythe';
+  const appName = branding.appTitle || 'TaskIT';
   const [open, setOpen] = useState(false); // default collapsed
 
   const brandMark = useMemo(() => {

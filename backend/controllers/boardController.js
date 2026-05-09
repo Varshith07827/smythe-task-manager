@@ -418,7 +418,7 @@ const boardController = {
 
       const emailService = require('../services/emailService');
       const branding = await emailService.getAppBranding();
-      const appName = branding.appTitle || 'Smythe';
+      const appName = branding.appTitle || 'TaskIT';
       const htmlBody = emailService.buildProgressDigestEmail(board.title, tasks, branding);
       const subject = `${appName} - ${board.title} progress report`;
 

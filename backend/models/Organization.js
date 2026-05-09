@@ -32,7 +32,7 @@ const organizationSchema = new mongoose.Schema({
     }
   },
   branding: {
-    appTitle:          { type: String, default: 'Smythe', trim: true },
+    appTitle:          { type: String, default: 'TaskIT', trim: true },
     tagline:           { type: String, default: '', trim: true },
     logoUrl:           { type: String, default: '', trim: true },
     logoShape:         { type: String, enum: ['circle', 'rounded', 'square'], default: 'rounded' },

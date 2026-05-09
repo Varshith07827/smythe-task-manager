@@ -1,18 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
 import { sharesApi } from '../api/shares';
 import { alert } from './AlertSystem';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { formatDistanceToNow } from 'date-fns';
 
-export default function ShareModal({ boardId, boardTitle, onClose }) {
+export default function ShareModal({ taskId, taskTitle, onClose }) {
   const [loading, setLoading] = useState(true);
   const [shareInfo, setShareInfo] = useState(null);
   const [creating, setCreating] = useState(false);
   const [revoking, setRevoking] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  // Create form
-  const [permission, setPermission] = useState('edit');
+  const [permission, setPermission] = useState('view');
   const [expiresIn, setExpiresIn] = useState('');
 
   const linkRef = useRef(null);
@@ -25,7 +24,7 @@ export default function ShareModal({ boardId, boardTitle, onClose }) {
 
   const loadShareInfo = async () => {
     try {
-      const res = await sharesApi.getShareInfo(boardId);
+      const res = await sharesApi.getShareInfo(taskId);
       setShareInfo(res.data);
     } catch {
       setShareInfo({ active: false });
@@ -39,7 +38,7 @@ export default function ShareModal({ boardId, boardTitle, onClose }) {
     try {
       const data = { permission };
       if (expiresIn) data.expiresIn = expiresIn;
-      const res = await sharesApi.createShareLink(boardId, data);
+      const res = await sharesApi.createShareLink(taskId, data);
       setShareInfo({ active: true, ...res.data });
       alert.success('Share link created');
     } catch (err) {
@@ -52,7 +51,7 @@ export default function ShareModal({ boardId, boardTitle, onClose }) {
   const handleRevoke = async () => {
     setRevoking(true);
     try {
-      await sharesApi.revokeShareLink(boardId);
+      await sharesApi.revokeShareLink(taskId);
       setShareInfo({ active: false });
       alert.success('Share link revoked');
     } catch (err) {
@@ -98,7 +97,7 @@ export default function ShareModal({ boardId, boardTitle, onClose }) {
         style={{ maxWidth: 520 }}
       >
         <div className="modal-header">
-          <h3>Share Board</h3>
+          <h3>Share Task</h3>
           <button className="modal-close" onClick={onClose}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
           </button>
@@ -110,13 +109,11 @@ export default function ShareModal({ boardId, boardTitle, onClose }) {
               <div className="spinner" />
             </div>
           ) : shareInfo?.active ? (
-            /* ===== ACTIVE SHARE ===== */
             <>
               <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                <strong>{boardTitle}</strong> is shared with anyone who has the link.
+                <strong>{taskTitle}</strong> is shared with anyone who has the link.
               </div>
 
-              {/* Link + Copy */}
               <div className="share-link-row">
                 <input
                   ref={linkRef}
@@ -148,7 +145,6 @@ export default function ShareModal({ boardId, boardTitle, onClose }) {
                 </button>
               </div>
 
-              {/* Info */}
               <div className="share-info">
                 <div className="share-info-row">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>
@@ -172,7 +168,6 @@ export default function ShareModal({ boardId, boardTitle, onClose }) {
                 </div>
               </div>
 
-              {/* Revoke */}
               <div className="share-danger-zone">
                 <div>
                   <div className="share-danger-label">Revoke access</div>
@@ -184,10 +179,9 @@ export default function ShareModal({ boardId, boardTitle, onClose }) {
               </div>
             </>
           ) : (
-            /* ===== NO ACTIVE SHARE ===== */
             <>
               <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                Create a shareable link for <strong>{boardTitle}</strong>. Anyone with the link will be able to access this board without logging in.
+                Create a shareable link for <strong>{taskTitle}</strong>. Anyone with the link will be able to access this task without logging in.
               </div>
 
               <div className="share-settings">

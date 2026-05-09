@@ -2518,8 +2518,12 @@ textarea.form-input { resize: vertical; min-height: 80px; }
   .settings-member-row { flex-wrap: wrap; gap: 6px; }
   .settings-member-info { flex-basis: 100%; }
   .settings-member-email { display: none; }
-  .settings-member-actions { width: 100%; margin-left: 40px; }
-  .settings-member-notify-toggles { flex-shrink: 1; }
+  .settings-member-actions { width: 100%; margin-left: 40px; flex-wrap: wrap; }
+  .settings-member-notify-toggles { flex-shrink: 1; min-width: 0; overflow-x: auto; }
+
+  /* Settings branding / automations mobile fixes */
+  .collapsible-card-body pre { font-size: 10px !important; word-break: break-all !important; }
+  .collapsible-card-body code { font-size: 10px !important; word-break: break-all; }
 
   /* Filter pills scrollable */
   .filter-pills { overflow-x: auto; -webkit-overflow-scrolling: touch; flex-wrap: nowrap; padding-bottom: 4px; }

@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
-const BoardShare = require('../models/BoardShare');
-const Board = require('../models/Board');
+const TaskShare = require('../models/TaskShare');
 const Task = require('../models/Task');
+const Board = require('../models/Board');
 const socketService = require('../services/socketService');
 const activityService = require('../services/activityService');
 const log = require('../utils/logger');
@@ -10,34 +10,26 @@ function isValidId(id) {
   return mongoose.Types.ObjectId.isValid(id) && String(new mongoose.Types.ObjectId(id)) === id;
 }
 
-// Sanitize user input for task fields
 function sanitizeText(text, maxLen = 500) {
   if (!text || typeof text !== 'string') return '';
   return text.replace(/<[^>]*>/g, '').trim().slice(0, maxLen);
 }
 
 const shareController = {
-  // ===================== CREATE SHARE LINK =====================
-  async createShareLink(req, res) {
+  // ===================== CREATE TASK SHARE LINK =====================
+  async createTaskShareLink(req, res) {
     try {
-      const { boardId } = req.params;
-      if (!isValidId(boardId)) return res.status(404).json({ error: 'Board not found' });
+      const { taskId } = req.params;
+      if (!isValidId(taskId)) return res.status(404).json({ error: 'Task not found' });
 
-      const board = await Board.findById(boardId).select('createdBy title');
-      if (!board) return res.status(404).json({ error: 'Board not found' });
+      const task = await Task.findById(taskId).select('board title');
+      if (!task) return res.status(404).json({ error: 'Task not found' });
 
-      // Only board owner or admin can share
-      const isOwner = board.createdBy.toString() === req.user._id.toString();
-      if (!isOwner && req.user.role !== 'admin') {
-        return res.status(403).json({ error: 'Only the board owner or an admin can share this board' });
-      }
-
-      const { permission = 'edit', expiresIn } = req.body;
-      if (!['view', 'comment', 'edit'].includes(permission)) {
+      const { permission = 'view', expiresIn } = req.body;
+      if (!['view', 'edit'].includes(permission)) {
         return res.status(400).json({ error: 'Invalid permission level' });
       }
 
-      // Calculate expiration
       let expiresAt = null;
       if (expiresIn) {
         const durations = { '1h': 3600, '24h': 86400, '7d': 604800, '30d': 2592000 };
@@ -46,32 +38,19 @@ const shareController = {
         expiresAt = new Date(Date.now() + seconds * 1000);
       }
 
-      // Revoke any existing active shares for this board (one active link at a time)
-      await BoardShare.updateMany(
-        { board: boardId, revoked: false },
+      // Revoke any existing active shares for this task
+      await TaskShare.updateMany(
+        { task: taskId, revoked: false },
         { revoked: true, revokedAt: new Date(), revokedBy: req.user._id }
       );
 
-      const share = await BoardShare.create({
-        board: boardId,
+      const share = await TaskShare.create({
+        task: taskId,
+        board: task.board,
         createdBy: req.user._id,
         permission,
         expiresAt
       });
-
-      // Log activity
-      try {
-        await activityService.log({
-          board: boardId,
-          user: req.user._id,
-          action: 'board_updated',
-          target: { type: 'board', id: boardId, name: board.title },
-          changes: [{ field: 'sharing', from: 'disabled', to: `${permission} access` }],
-          req
-        });
-      } catch (err) {
-        log.warn('Share', `Activity log failed: ${err.message}`);
-      }
 
       res.status(201).json({
         _id: share._id,
@@ -81,188 +60,108 @@ const shareController = {
         createdAt: share.createdAt
       });
     } catch (err) {
-      log.error('Share', `Create failed: ${err.message}`);
+      log.error('Share', `Create task share failed: ${err.message}`);
       res.status(500).json({ error: 'Failed to create share link' });
     }
   },
 
-  // ===================== GET SHARE INFO FOR A BOARD =====================
-  async getBoardShareInfo(req, res) {
+  // ===================== GET TASK SHARE INFO =====================
+  async getTaskShareInfo(req, res) {
     try {
-      const { boardId } = req.params;
-      if (!isValidId(boardId)) return res.status(404).json({ error: 'Board not found' });
+      const { taskId } = req.params;
+      if (!isValidId(taskId)) return res.status(404).json({ error: 'Task not found' });
 
-      const share = await BoardShare.findOne({ board: boardId, revoked: false })
+      const share = await TaskShare.findOne({ task: taskId, revoked: false })
         .select('token permission expiresAt accessCount lastAccessedAt createdAt')
         .lean();
 
       if (!share) return res.json({ active: false });
 
-      // Check if expired
       if (share.expiresAt && share.expiresAt < new Date()) {
         return res.json({ active: false, expired: true });
       }
 
-      res.json({
-        active: true,
-        ...share
-      });
+      res.json({ active: true, ...share });
     } catch (err) {
       res.status(500).json({ error: 'Failed to get share info' });
     }
   },
 
-  // ===================== REVOKE SHARE LINK =====================
-  async revokeShareLink(req, res) {
+  // ===================== REVOKE TASK SHARE LINK =====================
+  async revokeTaskShareLink(req, res) {
     try {
-      const { boardId } = req.params;
-      if (!isValidId(boardId)) return res.status(404).json({ error: 'Board not found' });
+      const { taskId } = req.params;
+      if (!isValidId(taskId)) return res.status(404).json({ error: 'Task not found' });
 
-      const board = await Board.findById(boardId).select('createdBy title');
-      if (!board) return res.status(404).json({ error: 'Board not found' });
-
-      const isOwner = board.createdBy.toString() === req.user._id.toString();
-      if (!isOwner && req.user.role !== 'admin') {
-        return res.status(403).json({ error: 'Only the board owner or an admin can revoke sharing' });
-      }
-
-      const result = await BoardShare.updateMany(
-        { board: boardId, revoked: false },
+      const result = await TaskShare.updateMany(
+        { task: taskId, revoked: false },
         { revoked: true, revokedAt: new Date(), revokedBy: req.user._id }
       );
 
-      try {
-        await activityService.log({
-          board: boardId,
-          user: req.user._id,
-          action: 'board_updated',
-          target: { type: 'board', id: boardId, name: board.title },
-          changes: [{ field: 'sharing', from: 'enabled', to: 'disabled' }],
-          req
-        });
-      } catch (err) {
-        log.warn('Share', `Activity log failed: ${err.message}`);
-      }
-
       res.json({ revoked: result.modifiedCount });
     } catch (err) {
-      log.error('Share', `Revoke failed: ${err.message}`);
+      log.error('Share', `Revoke task share failed: ${err.message}`);
       res.status(500).json({ error: 'Failed to revoke share link' });
     }
   },
 
-  // ===================== ACCESS PUBLIC BOARD (NO AUTH REQUIRED) =====================
-  async getPublicBoard(req, res) {
+  // ===================== ACCESS PUBLIC TASK (NO AUTH) =====================
+  async getPublicTask(req, res) {
     try {
       const { token } = req.params;
       if (!token || token.length !== 64) return res.status(404).json({ error: 'Invalid share link' });
 
-      const share = await BoardShare.findOne({ token });
+      const share = await TaskShare.findOne({ token });
       if (!share || !share.isActive()) {
         const reason = share?.revoked ? 'revoked' : share?.expiresAt < new Date() ? 'expired' : 'not_found';
         return res.status(404).json({ error: 'This share link is no longer valid', reason });
       }
 
-      const board = await Board.findById(share.board)
-        .select('-permissions')
+      const task = await Task.findById(share.task)
+        .populate('assignedTo', 'name avatar')
+        .populate('assignedBy', 'name')
+        .populate('comments.author', 'name avatar')
         .lean();
-      if (!board || board.archived) {
-        return res.status(404).json({ error: 'Board not found or archived' });
+
+      if (!task || task.archived) {
+        return res.status(404).json({ error: 'Task not found or archived' });
       }
 
-      const tasks = await Task.find({ board: board._id, archived: { $ne: true } })
-        .sort({ order: 1, createdAt: -1 })
-        .populate('assignedTo', 'name avatar')
-        .lean();
+      const board = await Board.findById(task.board).select('title columns').lean();
 
       // Update access count
-      BoardShare.updateOne(
+      TaskShare.updateOne(
         { _id: share._id },
         { $inc: { accessCount: 1 }, lastAccessedAt: new Date() }
       ).catch(() => {});
 
       res.json({
-        board,
-        tasks,
+        task,
+        board: board ? { title: board.title, columns: board.columns } : null,
         permission: share.permission,
         shareId: share._id
       });
     } catch (err) {
-      log.error('Share', `Public access failed: ${err.message}`);
-      res.status(500).json({ error: 'Failed to load board' });
-    }
-  },
-
-  // ===================== PUBLIC TASK CREATE =====================
-  async publicCreateTask(req, res) {
-    try {
-      const { token } = req.params;
-      if (!token || token.length !== 64) return res.status(404).json({ error: 'Invalid share link' });
-
-      const share = await BoardShare.findOne({ token });
-      if (!share || !share.isActive() || share.permission !== 'edit') {
-        return res.status(403).json({ error: 'Edit access not available' });
-      }
-
-      const board = await Board.findById(share.board);
-      if (!board || board.archived) return res.status(404).json({ error: 'Board not found' });
-
-      const { title, description, status, priority, dueDate, columnValues } = req.body;
-
-      if (!title?.trim()) return res.status(400).json({ error: 'Task title is required' });
-      const cleanTitle = sanitizeText(title, 500);
-      if (!cleanTitle) return res.status(400).json({ error: 'Task title is required' });
-
-      const maxOrder = await Task.findOne({ board: board._id }).sort({ order: -1 }).select('order').lean();
-
-      const task = await Task.create({
-        board: board._id,
-        title: cleanTitle,
-        description: sanitizeText(description, 5000) || undefined,
-        status: status || 'pending',
-        priority: priority || 'medium',
-        dueDate: dueDate || undefined,
-        columnValues: columnValues || {},
-        order: (maxOrder?.order ?? -1) + 1,
-        history: [{
-          changedBy: share.createdBy, // attribute to share creator
-          action: 'created',
-          metadata: { source: 'public_share' }
-        }]
-      });
-
-      const populated = await Task.findById(task._id)
-        .populate('assignedTo', 'name avatar')
-        .lean();
-
-      // Emit real-time update
-      try {
-        socketService.taskCreated(board._id.toString(), populated, 'public');
-      } catch {}
-
-      res.status(201).json(populated);
-    } catch (err) {
-      log.error('Share', `Public task create failed: ${err.message}`);
-      res.status(500).json({ error: 'Failed to create task' });
+      log.error('Share', `Public task access failed: ${err.message}`);
+      res.status(500).json({ error: 'Failed to load task' });
     }
   },
 
   // ===================== PUBLIC TASK UPDATE =====================
   async publicUpdateTask(req, res) {
     try {
-      const { token, taskId } = req.params;
+      const { token } = req.params;
       if (!token || token.length !== 64) return res.status(404).json({ error: 'Invalid share link' });
-      if (!isValidId(taskId)) return res.status(404).json({ error: 'Task not found' });
 
-      const share = await BoardShare.findOne({ token });
+      const share = await TaskShare.findOne({ token });
       if (!share || !share.isActive() || share.permission !== 'edit') {
         return res.status(403).json({ error: 'Edit access not available' });
       }
 
-      const task = await Task.findOne({ _id: taskId, board: share.board });
-      if (!task) return res.status(404).json({ error: 'Task not found' });
+      const task = await Task.findById(share.task);
+      if (!task || task.archived) return res.status(404).json({ error: 'Task not found' });
 
-      const allowed = ['title', 'description', 'status', 'priority', 'dueDate', 'startDate', 'columnValues', 'order'];
+      const allowed = ['title', 'description', 'status', 'priority', 'dueDate', 'columnValues'];
       const updates = {};
 
       for (const key of allowed) {
@@ -284,10 +183,12 @@ const shareController = {
 
       const populated = await Task.findById(task._id)
         .populate('assignedTo', 'name avatar')
+        .populate('assignedBy', 'name')
+        .populate('comments.author', 'name avatar')
         .lean();
 
       try {
-        socketService.taskUpdated(share.board.toString(), populated, 'public');
+        socketService.taskUpdated(task.board.toString(), populated, 'public');
       } catch {}
 
       res.json(populated);
@@ -297,33 +198,38 @@ const shareController = {
     }
   },
 
-  // ===================== PUBLIC TASK DELETE =====================
-  async publicDeleteTask(req, res) {
+  // ===================== PUBLIC ADD COMMENT =====================
+  async publicAddComment(req, res) {
     try {
-      const { token, taskId } = req.params;
+      const { token } = req.params;
       if (!token || token.length !== 64) return res.status(404).json({ error: 'Invalid share link' });
-      if (!isValidId(taskId)) return res.status(404).json({ error: 'Task not found' });
 
-      const share = await BoardShare.findOne({ token });
+      const share = await TaskShare.findOne({ token });
       if (!share || !share.isActive() || share.permission !== 'edit') {
         return res.status(403).json({ error: 'Edit access not available' });
       }
 
-      const task = await Task.findOneAndUpdate(
-        { _id: taskId, board: share.board },
-        { archived: true },
-        { new: true }
-      );
-      if (!task) return res.status(404).json({ error: 'Task not found' });
+      const { text, authorName } = req.body;
+      if (!text?.trim()) return res.status(400).json({ error: 'Comment text is required' });
 
-      try {
-        socketService.taskDeleted(share.board.toString(), taskId, 'public');
-      } catch {}
+      const task = await Task.findById(share.task);
+      if (!task || task.archived) return res.status(404).json({ error: 'Task not found' });
 
-      res.json({ message: 'Task archived' });
+      task.comments.push({
+        text: sanitizeText(text, 2000),
+        author: share.createdBy, // attribute to share creator
+        createdAt: new Date()
+      });
+      await task.save();
+
+      const populated = await Task.findById(task._id)
+        .populate('comments.author', 'name avatar')
+        .lean();
+
+      res.status(201).json(populated.comments[populated.comments.length - 1]);
     } catch (err) {
-      log.error('Share', `Public task delete failed: ${err.message}`);
-      res.status(500).json({ error: 'Failed to delete task' });
+      log.error('Share', `Public comment failed: ${err.message}`);
+      res.status(500).json({ error: 'Failed to add comment' });
     }
   }
 };

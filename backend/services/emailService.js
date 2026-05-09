@@ -34,7 +34,7 @@ async function getAppBranding() {
     const Organization = require('../models/Organization');
     const org = await Organization.findOne().select('branding').lean();
     brandingCache = {
-      appTitle: org?.branding?.appTitle || 'Smythe',
+      appTitle: org?.branding?.appTitle || 'TaskIT',
       tagline: org?.branding?.tagline || '',
       logoUrl: org?.branding?.logoUrl || '',
       logoShape: org?.branding?.logoShape || 'rounded',
@@ -48,7 +48,7 @@ async function getAppBranding() {
     return brandingCache;
   } catch {
     return {
-      appTitle: 'Smythe',
+      appTitle: 'TaskIT',
       tagline: '',
       logoUrl: '',
       logoShape: 'rounded',
@@ -105,7 +105,7 @@ const emailService = {
     const safeTitle = escapeHtml(title);
     const safeMessage = escapeHtml(message);
     const appUrl = publicAppUrl();
-    const appName = escapeHtml(brandingOverride?.appTitle || 'Smythe');
+    const appName = escapeHtml(brandingOverride?.appTitle || 'TaskIT');
 
     const typeColors = {
       task_assigned: '#0a84ff',
@@ -154,7 +154,7 @@ const emailService = {
   buildProgressDigestEmail(boardTitle, tasks, brandingOverride) {
     const safeBoard = escapeHtml(boardTitle);
     const appUrl = publicAppUrl();
-    const appName = escapeHtml(brandingOverride?.appTitle || 'Smythe');
+    const appName = escapeHtml(brandingOverride?.appTitle || 'TaskIT');
     const accentColor = brandingOverride?.accentColor || '#30d158';
     const rows = (tasks || []).map((t) => {
       const st = escapeHtml(String(t.status || '').replace(/_/g, ' '));

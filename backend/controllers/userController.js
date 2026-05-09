@@ -371,7 +371,7 @@ const userController = {
 
       const emailService = require('../services/emailService');
       const branding = await emailService.getAppBranding();
-      const appName = branding.appTitle || 'Smythe';
+      const appName = branding.appTitle || 'TaskIT';
       const timestamp = new Date().toISOString();
 
       const htmlBody = emailService.buildNotificationEmail(

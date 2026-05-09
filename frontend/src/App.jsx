@@ -13,7 +13,7 @@ import Archived from './pages/Archived';
 import AdminLogs from './pages/AdminLogs';
 import WidgetView from './pages/WidgetView';
 import Support from './pages/Support';
-import PublicBoard from './pages/PublicBoard';
+import PublicTask from './pages/PublicTask';
 import Layout from './components/Layout';
 
 function ProtectedRoute({ children }) {
@@ -30,7 +30,7 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
-        <Route path="/share/:token" element={<PublicBoard />} />
+        <Route path="/share/:token" element={<PublicTask />} />
         <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
           <Route index element={<Dashboard />} />
           <Route path="boards/:boardId/notifications" element={<BoardNotifications />} />

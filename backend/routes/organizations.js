@@ -36,7 +36,7 @@ router.get('/branding/public', async (req, res) => {
   try {
     const org = await Organization.findOne().select('branding settings.allowSignup').lean();
     const defaults = {
-      appTitle: 'Smythe', tagline: '', logoUrl: '', logoShape: 'rounded',
+      appTitle: 'TaskIT', tagline: '', logoUrl: '', logoShape: 'rounded',
       accentColor: '#0a84ff', logoSize: 48, showLogoInHeader: true,
       showLogoInSidebar: true, headerLogoUrl: '', headerLogoHeight: 36,
       showNameInHeader: true, faviconUrl: '', siteTitle: '', sidebarColor: '#1a1a2e'
@@ -44,7 +44,7 @@ router.get('/branding/public', async (req, res) => {
     res.json({ ...defaults, ...org?.branding, allowSignup: org?.settings?.allowSignup || false });
   } catch {
     res.json({
-      appTitle: 'Smythe', tagline: '', logoUrl: '', logoShape: 'rounded',
+      appTitle: 'TaskIT', tagline: '', logoUrl: '', logoShape: 'rounded',
       accentColor: '#0a84ff', logoSize: 48, showLogoInHeader: true,
       showLogoInSidebar: true, headerLogoUrl: '', headerLogoHeight: 36,
       showNameInHeader: true, faviconUrl: '', siteTitle: '', sidebarColor: '#1a1a2e',

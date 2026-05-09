@@ -43,8 +43,8 @@ router.patch('/:boardId/tasks/:taskId', authenticate, checkBoardAccess('edit'), 
 router.delete('/:boardId/tasks/:taskId', authenticate, checkBoardAccess('edit'), taskController.archive);
 router.patch('/:boardId/tasks/:taskId/unarchive', authenticate, checkBoardAccess('edit'), taskController.unarchive);
 router.delete('/:boardId/tasks/:taskId/permanent', authenticate, checkBoardAccess('edit'), taskController.permanentDelete);
-router.post('/:boardId/tasks/:taskId/remind', authenticate, authorize('admin'), taskController.remind);
-router.patch('/:boardId/tasks/:taskId/notifications', authenticate, authorize('admin'), checkBoardAccess('edit'), taskController.updateNotifications);
+router.post('/:boardId/tasks/:taskId/remind', authenticate, checkBoardAccess('edit'), taskController.remind);
+router.patch('/:boardId/tasks/:taskId/notifications', authenticate, checkBoardAccess('edit'), taskController.updateNotifications);
 
 // Task comments
 router.post('/:boardId/tasks/:taskId/comments', authenticate, checkBoardAccess('edit'), taskController.addComment);
