@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useBranding } from '../context/BrandingContext';
 
@@ -11,6 +11,7 @@ export default function AuthLayout({ navLinks = [], onSupport, children }) {
   const branding = useBranding();
   const appName = branding.appTitle || 'TaskIT';
   const [open, setOpen] = useState(false); // default collapsed
+  const sidebarHoverTimeout = useRef(null);
 
   const brandMark = useMemo(() => {
     if (!appName) return 'S';
@@ -22,6 +23,17 @@ export default function AuthLayout({ navLinks = [], onSupport, children }) {
   const logoRadius = branding.logoShape === 'circle' ? '50%'
     : branding.logoShape === 'square' ? '4px' : '10px';
 
+  const handleSidebarEnter = useCallback(() => {
+    clearTimeout(sidebarHoverTimeout.current);
+    setOpen(true);
+  }, []);
+
+  const handleSidebarLeave = useCallback(() => {
+    sidebarHoverTimeout.current = setTimeout(() => setOpen(false), 200);
+  }, []);
+
+  useEffect(() => () => clearTimeout(sidebarHoverTimeout.current), []);
+
   return (
     <div className="app-layout">
       <aside
@@ -29,6 +41,8 @@ export default function AuthLayout({ navLinks = [], onSupport, children }) {
         className={`sidebar${open ? ' sidebar--open' : ''}`}
         aria-label="Auth navigation"
         style={branding.sidebarColor ? { background: branding.sidebarColor } : undefined}
+        onMouseEnter={handleSidebarEnter}
+        onMouseLeave={handleSidebarLeave}
       >
         <div className="sidebar-brand">
           <div className="sidebar-brand-left">
@@ -48,19 +62,6 @@ export default function AuthLayout({ navLinks = [], onSupport, children }) {
               <span className="sidebar-brand-tagline">{branding.tagline || 'Task Management'}</span>
             </div>
           </div>
-          <button
-            type="button"
-            className="sidebar-collapse-btn"
-            onClick={() => setOpen(v => !v)}
-            aria-expanded={open}
-            aria-controls="auth-sidebar"
-            aria-label={open ? 'Collapse sidebar' : 'Expand sidebar'}
-            title={open ? 'Collapse' : 'Expand'}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              {open ? <polyline points="15 18 9 12 15 6" /> : <polyline points="9 18 15 12 9 6" />}
-            </svg>
-          </button>
         </div>
 
         <nav className="sidebar-nav">

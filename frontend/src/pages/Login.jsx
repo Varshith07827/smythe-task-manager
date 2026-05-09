@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { useNavigate, Link, useLocation } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { useBranding } from '../context/BrandingContext';
 import { authApi } from '../api/auth';
 import { alert } from '../components/AlertSystem';
 import PasswordInput from '../components/PasswordInput';
+import AuthLayout from '../components/AuthLayout';
 import { motion } from 'framer-motion';
 
 const DEMO_PASSWORD = import.meta.env.VITE_DEMO_PASSWORD || 'SmytheDemo123!';
@@ -66,9 +66,27 @@ export default function Login() {
     }
   };
   const { login, loginWithToken } = useAuth();
-  const branding = useBranding();
   const navigate = useNavigate();
-  const appName = branding.appTitle || 'TaskIT';
+  const navLinks = [
+    {
+      to: '/register',
+      label: 'Sign Up',
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="8.5" cy="7" r="4" /><line x1="20" y1="8" x2="20" y2="14" /><line x1="23" y1="11" x2="17" y2="11" />
+        </svg>
+      )
+    },
+    {
+      onClick: openSupport,
+      label: 'Support',
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3" /><line x1="12" y1="17" x2="12.01" y2="17" />
+        </svg>
+      )
+    }
+  ];
 
   const handlePasswordLogin = async (e) => {
     e.preventDefault();
@@ -132,55 +150,14 @@ export default function Login() {
   };
 
   return (
-    <div className="login-layout">
-      {/* Sidebar */}
-      <aside className="login-sidebar" style={branding.sidebarColor ? { background: branding.sidebarColor } : undefined}>
-        <div className="login-sidebar-brand">
-          {branding.logoUrl ? (
-            <img src={branding.logoUrl} alt={appName} style={{
-              height: 36, width: 36, objectFit: 'cover',
-              borderRadius: branding.logoShape === 'circle' ? '50%' : branding.logoShape === 'square' ? 4 : 8
-            }} />
-          ) : (
-            <div className="login-sidebar-icon">{appName[0]}</div>
-          )}
-          <span className="login-sidebar-title">{appName}</span>
-        </div>
-
-        <nav className="login-sidebar-nav">
-          <Link to="/register" className="login-sidebar-link">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/>
-            </svg>
-            <span>Sign Up</span>
-          </Link>
-          <button type="button" className="login-sidebar-link" style={{ background: 'none', border: 'none', cursor: 'pointer', width: '100%', textAlign: 'left' }} onClick={openSupport}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-            </svg>
-            <span>Support</span>
-          </button>
-        </nav>
-
-        <div className="login-sidebar-footer">
-          <span>v1.0</span>
-        </div>
-      </aside>
-
-      {/* Main area */}
-      <main className="login-main">
-        <header className="login-header" style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-          <Link to="/register" className="login-header-link" style={{ textDecoration: 'none' }}>Sign Up</Link>
-          <button type="button" className="login-header-link" style={{ background: 'none', border: 'none', cursor: 'pointer' }} onClick={openSupport}>Support</button>
-        </header>
-
-        <div className="login-center">
-          <motion.div
-            className="auth-card"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
-          >
+    <AuthLayout navLinks={navLinks} onSupport={openSupport}>
+      <div className="login-center">
+        <motion.div
+          className="auth-card"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
+        >
             <h2 style={{ textAlign: 'center', marginBottom: 20 }}>User Login</h2>
 
             <div className="auth-tabs">
@@ -311,12 +288,11 @@ export default function Login() {
               </div>
             )}
 
-            <div className="auth-footer" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-              <button type="button" onClick={openSupport} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', fontSize: 13, padding: 0 }}>Help with Login?</button>
-            </div>
-          </motion.div>
-        </div>
-      </main>
+          <div className="auth-footer" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+            <button type="button" onClick={openSupport} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', fontSize: 13, padding: 0 }}>Help with Login?</button>
+          </div>
+        </motion.div>
+      </div>
 
       {showSupport && (
         <div className="modal-overlay" onClick={() => setShowSupport(false)}>
@@ -382,6 +358,6 @@ export default function Login() {
           </motion.div>
         </div>
       )}
-    </div>
+    </AuthLayout>
   );
 }
