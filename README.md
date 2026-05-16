@@ -69,7 +69,7 @@ Transactional emails use the same JSON shape as the Noteify API: `apikey`, `emai
 
 ## Production deploy (example)
 
-Typical layout: MongoDB on the same host, Node listening on `127.0.0.1:5000`, Nginx serving the Vite build from `/var/www/dev.anydb.pro` and proxying `/api/` and `/socket.io/` to Node.
+Typical layout: MongoDB on the same host, Node listening on `127.0.0.1:5002`, Nginx serving the Vite build from `/var/www/dev.anydb.pro` and proxying `/api/` and `/socket.io/` to Node.
 
 1. **MongoDB** — Install MongoDB 7.x (or current LTS) for your OS; use `MONGO_URI=mongodb://127.0.0.1:27017/smythe` (or your DB name) in `backend/.env`.
 

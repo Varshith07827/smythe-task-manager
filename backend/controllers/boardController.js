@@ -28,7 +28,7 @@ const boardController = {
 
       res.status(201).json(board);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: 'Failed to create board' });
     }
   },
 
@@ -70,7 +70,7 @@ const boardController = {
 
       res.json(boardsWithCount);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: 'Failed to fetch boards' });
     }
   },
 
@@ -81,7 +81,7 @@ const boardController = {
       if (!board) return res.status(404).json({ error: 'Board not found' });
       res.json(board);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: 'Failed to fetch board' });
     }
   },
 
@@ -104,7 +104,7 @@ const boardController = {
       socketService.boardUpdated(board._id, $set, req.user);
       res.json(board);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: 'Failed to update board' });
     }
   },
 
@@ -118,7 +118,7 @@ const boardController = {
       await Board.findByIdAndUpdate(req.params.boardId, { archived: true });
       res.json({ message: 'Board archived' });
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: 'Failed to archive board' });
     }
   },
 
@@ -146,7 +146,7 @@ const boardController = {
         .lean();
       res.json(boards);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: 'Failed to fetch archived boards' });
     }
   },
 
@@ -160,7 +160,7 @@ const boardController = {
       const updated = await Board.findByIdAndUpdate(req.params.boardId, { archived: false }, { new: true });
       res.json(updated);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: 'Failed to restore board' });
     }
   },
 
@@ -176,7 +176,7 @@ const boardController = {
       await Board.findByIdAndDelete(board._id);
       res.json({ message: 'Board permanently deleted' });
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: 'Failed to delete board' });
     }
   },
 
@@ -195,7 +195,7 @@ const boardController = {
       socketService.boardUpdated(board._id, { columns: board.columns }, req.user);
       res.json(board);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: 'Failed to add column' });
     }
   },
 
@@ -215,7 +215,7 @@ const boardController = {
       socketService.boardUpdated(board._id, { columns: board.columns }, req.user);
       res.json(board);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: 'Failed to update column' });
     }
   },
 
@@ -229,7 +229,7 @@ const boardController = {
       socketService.boardUpdated(board._id, { columns: board.columns }, req.user);
       res.json(board);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: 'Failed to remove column' });
     }
   },
 
@@ -255,7 +255,7 @@ const boardController = {
       socketService.boardUpdated(board._id, { columns: board.columns }, req.user);
       res.json(board);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: 'Failed to replace columns' });
     }
   },
 
@@ -274,7 +274,7 @@ const boardController = {
       socketService.boardUpdated(board._id, { columns: board.columns }, req.user);
       res.json(board);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: 'Failed to reorder columns' });
     }
   },
 
@@ -321,7 +321,7 @@ const boardController = {
       socketService.boardUpdated(board._id, { permissions: board.permissions }, req.user);
       res.json(board);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: 'Failed to update permissions' });
     }
   },
 
@@ -334,7 +334,7 @@ const boardController = {
       );
       res.json(activity);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: 'Failed to fetch activity' });
     }
   },
 
@@ -398,7 +398,7 @@ const boardController = {
         emailDeliveryConfigured
       });
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: 'Failed to fetch notification schedule' });
     }
   },
 
@@ -432,7 +432,7 @@ const boardController = {
 
       res.json({ message: `Progress report sent to ${email}` });
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: 'Failed to send progress report' });
     }
   }
 };

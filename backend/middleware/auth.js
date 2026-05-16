@@ -17,7 +17,11 @@ function pruneCache() {
 const authenticate = async (req, res, next) => {
   try {
     const authHeader = req.header('Authorization');
-    const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+    const headerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+    // Fallback for browser-initiated requests (<img>, <iframe>, direct downloads)
+    // where custom Authorization headers cannot be attached.
+    const queryToken = typeof req.query?.token === 'string' ? req.query.token : null;
+    const token = headerToken || queryToken;
     if (!token) return res.status(401).json({ error: 'Authentication required' });
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);

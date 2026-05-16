@@ -75,5 +75,6 @@ taskSchema.index({ board: 1, priority: 1 });
 taskSchema.index({ assignedTo: 1, status: 1, dueDate: 1 });
 taskSchema.index({ title: 'text', description: 'text' });
 taskSchema.index({ parentTask: 1 });
+taskSchema.index({ archived: 1 });
 
 module.exports = mongoose.model('Task', taskSchema);

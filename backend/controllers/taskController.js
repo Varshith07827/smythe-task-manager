@@ -6,6 +6,7 @@ const socketService = require('../services/socketService');
 const notificationService = require('../services/notificationService');
 const { buildTaskQuery, buildTaskSort } = require('../utils/queryBuilder');
 const { getEditableFields } = require('../middleware/rbac');
+const log = require('../utils/logger');
 
 const MAX_BULK = 100;
 
@@ -88,7 +89,8 @@ const taskController = {
       socketService.taskCreated(boardId, populated, req.user);
       res.status(201).json(populated);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      log.error('Task', `Create failed: ${err.message}`);
+      res.status(500).json({ error: 'Failed to create task' });
     }
   },
 
@@ -122,7 +124,8 @@ const taskController = {
         pages: Math.ceil(total / safeLimit)
       });
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      log.error('Task', `GetAll failed: ${err.message}`);
+      res.status(500).json({ error: 'Failed to fetch tasks' });
     }
   },
 
@@ -137,7 +140,8 @@ const taskController = {
       if (!task) return res.status(404).json({ error: 'Task not found' });
       res.json(task);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      log.error('Task', `GetOne failed: ${err.message}`);
+      res.status(500).json({ error: 'Failed to fetch task' });
     }
   },
 
@@ -216,11 +220,10 @@ const taskController = {
           );
 
           if (recipientIds.size === 0) {
-            const orgAdmins = await User.find({
-              role: 'admin',
-              _id: { $ne: req.user._id }
+            const admins = await User.find({
+              role: 'admin', _id: { $ne: req.user._id }
             }).select('_id').lean();
-            for (const a of orgAdmins) recipientIds.add(a._id.toString());
+            for (const a of admins) recipientIds.add(a._id.toString());
           }
 
           const statusLabel = newStatusValue.replace(/_/g, ' ');
@@ -242,7 +245,8 @@ const taskController = {
       socketService.taskUpdated(task.board.toString(), populated, req.user);
       res.json(populated);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      log.error('Task', `Update failed: ${err.message}`);
+      res.status(500).json({ error: 'Failed to update task' });
     }
   },
 
@@ -257,7 +261,8 @@ const taskController = {
       socketService.taskDeleted(task.board.toString(), task._id, req.user);
       res.json({ message: 'Task archived' });
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      log.error('Task', `Archive failed: ${err.message}`);
+      res.status(500).json({ error: 'Failed to archive task' });
     }
   },
 
@@ -273,7 +278,8 @@ const taskController = {
       socketService.taskUpdated(task.board.toString(), task, req.user);
       res.json(task);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      log.error('Task', `Unarchive failed: ${err.message}`);
+      res.status(500).json({ error: 'Failed to unarchive task' });
     }
   },
 
@@ -297,7 +303,8 @@ const taskController = {
       socketService.taskDeleted(boardId, task._id, req.user);
       res.json({ message: 'Task permanently deleted' });
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      log.error('Task', `PermanentDelete failed: ${err.message}`);
+      res.status(500).json({ error: 'Failed to delete task' });
     }
   },
 
@@ -325,7 +332,8 @@ const taskController = {
       socketService.bulkTasksUpdated(bid, taskIds, { deleted: true }, req.user);
       res.json({ deleted: tasks.length });
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      log.error('Task', `BulkDelete failed: ${err.message}`);
+      res.status(500).json({ error: 'Failed to delete tasks' });
     }
   },
 
@@ -383,7 +391,8 @@ const taskController = {
       socketService.taskUpdated(task.board.toString(), task, req.user);
       res.json(task.comments[task.comments.length - 1]);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      log.error('Task', `AddComment failed: ${err.message}`);
+      res.status(500).json({ error: 'Failed to add comment' });
     }
   },
 
@@ -412,7 +421,8 @@ const taskController = {
 
       res.json(populated.comments.find(c => c._id.toString() === commentId));
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      log.error('Task', `UpdateComment failed: ${err.message}`);
+      res.status(500).json({ error: 'Failed to update comment' });
     }
   },
 
@@ -435,7 +445,8 @@ const taskController = {
       socketService.taskUpdated(task.board.toString(), task, req.user);
       res.json({ message: 'Comment deleted' });
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      log.error('Task', `DeleteComment failed: ${err.message}`);
+      res.status(500).json({ error: 'Failed to delete comment' });
     }
   },
 
@@ -444,7 +455,8 @@ const taskController = {
       const activity = await activityService.getTaskActivity(req.params.taskId);
       res.json(activity);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      log.error('Task', `GetActivity failed: ${err.message}`);
+      res.status(500).json({ error: 'Failed to fetch activity' });
     }
   },
 
@@ -496,7 +508,8 @@ const taskController = {
       socketService.bulkTasksUpdated(bid, taskIds, { assignedTo: assignTo }, req.user);
       res.json({ modified: result.modifiedCount });
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      log.error('Task', `BulkAssign failed: ${err.message}`);
+      res.status(500).json({ error: 'Failed to assign tasks' });
     }
   },
 
@@ -537,8 +550,8 @@ const taskController = {
 
       const actorId = req.user._id.toString();
       const statusLabel = status.replace(/_/g, ' ');
+      let cachedAdminIds = null;
       for (const t of tasks) {
-        // Respect per-task notification settings
         const tn = t.taskNotifications || {};
         const taskStatusNotifEnabled = tn.statusChanged !== false;
         const allowedStatuses = Array.isArray(tn.notifyOnStatuses) && tn.notifyOnStatuses.length > 0
@@ -554,11 +567,13 @@ const taskController = {
           recipientIds.add(t.assignedBy.toString());
         }
         if (recipientIds.size === 0) {
-          const orgAdmins = await User.find({
-            role: 'admin',
-            _id: { $ne: req.user._id }
-          }).select('_id').lean();
-          for (const a of orgAdmins) recipientIds.add(a._id.toString());
+          if (!cachedAdminIds) {
+            const admins = await User.find({
+              role: 'admin', _id: { $ne: req.user._id }
+            }).select('_id').lean();
+            cachedAdminIds = admins.map(a => a._id.toString());
+          }
+          for (const id of cachedAdminIds) recipientIds.add(id);
         }
         for (const rid of recipientIds) {
           await notificationService.create({
@@ -583,7 +598,8 @@ const taskController = {
       socketService.bulkTasksUpdated(bid, taskIds, { status }, req.user);
       res.json({ modified: result.modifiedCount });
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      log.error('Task', `BulkStatusChange failed: ${err.message}`);
+      res.status(500).json({ error: 'Failed to update task statuses' });
     }
   },
 
@@ -602,7 +618,8 @@ const taskController = {
       socketService.bulkTasksUpdated(bid, taskIds, { archived: true }, req.user);
       res.json({ archived: result.modifiedCount });
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      log.error('Task', `BulkArchive failed: ${err.message}`);
+      res.status(500).json({ error: 'Failed to archive tasks' });
     }
   },
 
@@ -621,7 +638,8 @@ const taskController = {
       socketService.bulkTasksUpdated(bid, taskIds, { archived: false }, req.user);
       res.json({ restored: result.modifiedCount });
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      log.error('Task', `BulkUnarchive failed: ${err.message}`);
+      res.status(500).json({ error: 'Failed to unarchive tasks' });
     }
   },
 
@@ -655,7 +673,8 @@ const taskController = {
 
       res.json(task.taskNotifications);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      log.error('Task', `UpdateNotifications failed: ${err.message}`);
+      res.status(500).json({ error: 'Failed to update notifications' });
     }
   },
 
@@ -710,7 +729,8 @@ const taskController = {
 
       res.json({ message: 'Reminders sent' });
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      log.error('Task', `Remind failed: ${err.message}`);
+      res.status(500).json({ error: 'Failed to send reminders' });
     }
   }
 };

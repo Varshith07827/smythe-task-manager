@@ -10,7 +10,7 @@ const notificationController = {
       );
       res.json(notifications);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: 'Failed to fetch notifications' });
     }
   },
 
@@ -19,7 +19,7 @@ const notificationController = {
       const count = await notificationService.getUnreadCount(req.user._id);
       res.json({ count });
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: 'Failed to fetch unread count' });
     }
   },
 
@@ -28,7 +28,7 @@ const notificationController = {
       const notification = await notificationService.markAsRead(req.params.id, req.user._id);
       res.json(notification);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: 'Failed to mark notification as read' });
     }
   },
 
@@ -37,7 +37,7 @@ const notificationController = {
       await notificationService.markAllAsRead(req.user._id);
       res.json({ message: 'All notifications marked as read' });
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: 'Failed to mark all notifications as read' });
     }
   }
 };

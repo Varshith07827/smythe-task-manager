@@ -4,7 +4,7 @@ import { useAuth } from './AuthContext';
 
 const SocketContext = createContext(null);
 
-const SOCKET_URL = import.meta.env.DEV ? `${window.location.protocol}//${window.location.hostname}:5000` : '/';
+const SOCKET_URL = import.meta.env.DEV ? `${window.location.protocol}//${window.location.hostname}:5004` : '/';
 
 export function SocketProvider({ children }) {
   const { token } = useAuth();
@@ -26,13 +26,9 @@ export function SocketProvider({ children }) {
       reconnectionAttempts: 5
     });
 
-    s.on('connect', () => {
-      console.log('Socket connected');
-    });
+    s.on('connect', () => {});
 
-    s.on('connect_error', (err) => {
-      console.warn('Socket connection error:', err.message);
-    });
+    s.on('connect_error', () => {});
 
     setSocket(s);
 

@@ -567,7 +567,7 @@ export default function Settings() {
                     }
                   ].map(({ key, label, description, cron, envVar, job }) => {
                     const isExternal = automations[key].cronMode === 'external';
-                    const apiBase = window.location.origin.replace(':5173', ':5000').replace(':3000', ':5000');
+                    const apiBase = window.location.origin.replace(':5173', ':5002').replace(':3000', ':5002');
                     const triggerUrl = `${apiBase}/api/organizations/me/automations/trigger/${job}`;
                     const curlCmd = `curl -X POST "${triggerUrl}" \\\n  -H "Authorization: Bearer <your-admin-jwt>"`;
                     return (

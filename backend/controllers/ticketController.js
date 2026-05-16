@@ -214,18 +214,19 @@ const ticketController = {
         .populate('sender', 'name email avatar role')
         .lean();
 
-      // Mark as read by current user
+      // Mark as read by current user (atomic: filter out old entry + append new one)
       await Ticket.updateOne(
         { _id: ticket._id },
-        {
-          $pull: { readBy: { user: req.user._id } }
-        }
-      );
-      await Ticket.updateOne(
-        { _id: ticket._id },
-        {
-          $push: { readBy: { user: req.user._id, readAt: new Date() } }
-        }
+        [{
+          $set: {
+            readBy: {
+              $concatArrays: [
+                { $filter: { input: '$readBy', as: 'r', cond: { $ne: ['$$r.user', req.user._id] } } },
+                [{ user: req.user._id, readAt: new Date() }]
+              ]
+            }
+          }
+        }]
       );
 
       res.json({ ticket, messages });

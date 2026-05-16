@@ -110,7 +110,7 @@ const widgetController = {
       const result = await checkEmbedHeaders(validation.url);
       res.json(result);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: 'Failed to check embed status' });
     }
   },
 
@@ -140,7 +140,7 @@ const widgetController = {
         const msg = Object.values(err.errors).map(e => e.message).join(', ');
         return res.status(400).json({ error: msg });
       }
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: 'Failed to create widget' });
     }
   },
 
@@ -151,7 +151,7 @@ const widgetController = {
         .lean();
       res.json(widgets);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: 'Failed to fetch widgets' });
     }
   },
 
@@ -183,7 +183,7 @@ const widgetController = {
         const msg = Object.values(err.errors).map(e => e.message).join(', ');
         return res.status(400).json({ error: msg });
       }
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: 'Failed to update widget' });
     }
   },
 
@@ -195,7 +195,7 @@ const widgetController = {
       if (!widget) return res.status(404).json({ error: 'Widget not found' });
       res.json({ message: 'Widget deleted' });
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: 'Failed to delete widget' });
     }
   }
 };

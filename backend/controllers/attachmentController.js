@@ -82,7 +82,7 @@ const attachmentController = {
 
       res.status(201).json(attachment);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: 'Failed to upload attachment' });
     }
   },
 
@@ -99,7 +99,7 @@ const attachmentController = {
         .sort({ createdAt: -1 });
       res.json(attachments);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: 'Failed to fetch attachments' });
     }
   },
 
@@ -115,7 +115,7 @@ const attachmentController = {
       const filePath = uploadService.getFilePath(attachment.storageKey);
       res.download(filePath, attachment.filename);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: 'Failed to download attachment' });
     }
   },
 
@@ -132,7 +132,7 @@ const attachmentController = {
       res.setHeader('Content-Type', attachment.mimeType);
       res.sendFile(filePath);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: 'Failed to view attachment' });
     }
   },
 
@@ -164,7 +164,7 @@ const attachmentController = {
 
       res.json({ message: 'Attachment deleted' });
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: 'Failed to delete attachment' });
     }
   }
 };

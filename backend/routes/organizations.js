@@ -59,7 +59,7 @@ router.get('/me', authenticate, async (req, res) => {
     if (!org) return res.status(404).json({ error: 'Organization not found' });
     res.json(org);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Failed to fetch organization' });
   }
 });
 
@@ -90,7 +90,7 @@ router.patch('/me', authenticate, authorize('admin'), async (req, res) => {
     if (!org) return res.status(404).json({ error: 'Organization not found' });
     res.json(org);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Failed to update organization' });
   }
 });
 
@@ -116,7 +116,7 @@ router.post('/me/branding/upload', authenticate, authorize('admin'), brandingUpl
 
     res.json({ url: fileUrl });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Failed to upload branding file' });
   }
 });
 
@@ -142,7 +142,7 @@ router.get('/me/automations', authenticate, authorize('admin'), async (req, res)
       }
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Failed to fetch automation settings' });
   }
 });
 
@@ -196,7 +196,7 @@ router.patch('/me/automations', authenticate, authorize('admin'), async (req, re
     await Organization.findOneAndUpdate({}, { $set: update });
     res.json({ ok: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Failed to update automation settings' });
   }
 });
 
@@ -206,7 +206,7 @@ router.post('/me/automations/trigger/deadline-reminder', authenticate, authorize
     await runDeadlineCheck();
     res.json({ ok: true, triggered: 'deadline-reminder' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Failed to trigger deadline reminder' });
   }
 });
 
@@ -216,14 +216,14 @@ router.post('/me/automations/trigger/progress-digest', authenticate, authorize('
     await runProgressDigestTick();
     res.json({ ok: true, triggered: 'progress-digest' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Failed to trigger progress digest' });
   }
 });
 
 router.use((err, req, res, next) => {
   if (err instanceof multer.MulterError) {
     if (err.code === 'LIMIT_FILE_SIZE') return res.status(400).json({ error: 'PNG file is too large. Max size is 10MB.' });
-    return res.status(400).json({ error: err.message });
+    return res.status(400).json({ error: 'File upload error' });
   }
   return next(err);
 });

@@ -120,9 +120,18 @@ process.on('unhandledRejection', (reason) => {
   log.error('UnhandledRejection', String(reason));
 });
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5002;
 
 let schedulerCleanups = [];
+
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    log.error('Server', `Port ${PORT} is already in use. Set PORT to a free port or stop the conflicting process.`);
+  } else {
+    log.error('Server', 'Failed to start HTTP server', err.message);
+  }
+  process.exit(1);
+});
 
 connectDB().then(() => {
   server.listen(PORT, '0.0.0.0', () => {

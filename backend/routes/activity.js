@@ -16,7 +16,7 @@ router.get('/global', authenticate, authorize('admin'), async (req, res) => {
     });
     res.json(result);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Failed to fetch activity logs' });
   }
 });
 

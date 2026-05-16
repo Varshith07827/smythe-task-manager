@@ -9,7 +9,7 @@ const { validateColumnValues } = require('../middleware/validate');
 // Board CRUD
 router.post('/', authenticate, boardController.create);
 router.get('/', authenticate, boardController.getAll);
-router.get('/archived', authenticate, authorize('admin'), boardController.getArchived);
+router.get('/archived', authenticate, boardController.getArchived);
 router.get('/:boardId', authenticate, checkBoardAccess('view'), boardController.getOne);
 router.patch('/:boardId', authenticate, checkBoardAccess('edit'), boardController.update);
 router.patch('/:boardId/restore', authenticate, checkBoardAccess('edit'), boardController.restore);

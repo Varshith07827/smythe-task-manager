@@ -13,7 +13,7 @@ const userController = {
         .sort({ name: 1 });
       res.json(users);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: 'Failed to fetch organization members' });
     }
   },
 
@@ -26,7 +26,7 @@ const userController = {
         .sort({ name: 1 });
       res.json(users);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: 'Failed to fetch members' });
     }
   },
 
@@ -59,7 +59,7 @@ const userController = {
 
       res.json(user);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: 'Failed to change user role' });
     }
   },
 
@@ -83,7 +83,7 @@ const userController = {
       if (!user) return res.status(404).json({ error: 'User not found' });
       res.json(user);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: 'Failed to change user status' });
     }
   },
 
@@ -144,7 +144,7 @@ const userController = {
         removedTasks: affectedTasks.length
       });
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: 'Failed to remove user' });
     }
   },
 
@@ -207,7 +207,7 @@ const userController = {
         restoredTasks: taskIds.length
       });
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: 'Failed to restore user' });
     }
   },
 
@@ -232,7 +232,7 @@ const userController = {
       await user.save({ validateModifiedOnly: true });
       res.json(user.notificationPreferences);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: 'Failed to update notification preferences' });
     }
   },
 
@@ -260,7 +260,7 @@ const userController = {
       await target.save({ validateModifiedOnly: true });
       res.json(target.notificationPreferences);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: 'Failed to update member notification preferences' });
     }
   },
 
@@ -281,7 +281,7 @@ const userController = {
         .select('name email role status avatar phone');
       res.json(user);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: 'Failed to update profile' });
     }
   },
 
@@ -308,7 +308,7 @@ const userController = {
         .select('name email role status avatar phone createdAt');
       res.json(updated);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: 'Failed to update member profile' });
     }
   },
 
@@ -332,7 +332,7 @@ const userController = {
         .select('name email role status avatar');
       res.json({ url: avatarUrl, user });
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: 'Failed to upload avatar' });
     }
   },
 
@@ -349,7 +349,7 @@ const userController = {
       if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Not found' });
       res.sendFile(filePath);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: 'Failed to serve avatar' });
     }
   },
 
@@ -388,7 +388,7 @@ const userController = {
 
       res.json({ message: 'Password support request sent to administrators' });
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: 'Failed to send password support request' });
     }
   },
 
@@ -405,7 +405,7 @@ const userController = {
 
       res.json({ verified: true });
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: 'Failed to verify password' });
     }
   },
 
@@ -433,7 +433,7 @@ const userController = {
 
       res.json({ message: 'Password updated successfully' });
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: 'Failed to change password' });
     }
   }
 };
