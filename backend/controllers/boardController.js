@@ -3,6 +3,7 @@ const Task = require('../models/Task');
 const activityService = require('../services/activityService');
 const socketService = require('../services/socketService');
 const notificationService = require('../services/notificationService');
+const log = require('../utils/logger');
 
 const boardController = {
   async create(req, res) {
@@ -195,6 +196,7 @@ const boardController = {
       socketService.boardUpdated(board._id, { columns: board.columns }, req.user);
       res.json(board);
     } catch (err) {
+      log.error('Board', `AddColumn failed: ${err.message}`);
       res.status(500).json({ error: 'Failed to add column' });
     }
   },

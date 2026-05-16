@@ -44,7 +44,18 @@
       "Bash(git log *)",
       "Bash(node -c controllers/taskController.js)",
       "Bash(node -e ' *)",
-      "Bash(node -e \"require\\('./controllers/widgetController'\\); require\\('./routes/widgets'\\); console.log\\('Backend widget files OK'\\)\")"
+      "Bash(node -e \"require\\('./controllers/widgetController'\\); require\\('./routes/widgets'\\); console.log\\('Backend widget files OK'\\)\")",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\alone\\\\OneDrive\\\\Desktop\\\\Smythe\\\\.claude\\\\worktrees\\\\gifted-ptolemy-7f996e\" -Recurse -Directory)",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(npm run *)",
+      "Bash(python -c ' *)",
+      "mcp__Claude_in_Chrome__tabs_context_mcp",
+      "mcp__Claude_in_Chrome__browser_batch",
+      "mcp__Claude_in_Chrome__resize_window",
+      "mcp__Claude_in_Chrome__computer",
+      "mcp__Claude_in_Chrome__navigate",
+      "Bash(ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 novusdev@45.90.223.131 \"cat /var/www/dev.anydb.pro/backend/.env | grep -i 'SEED\\\\|ADMIN'\")",
+      "Bash(git push *)"
     ]
   }
 }
