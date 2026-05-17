@@ -513,6 +513,22 @@ const taskController = {
     }
   },
 
+  async reorderTasks(req, res) {
+    try {
+      const { orderedIds } = req.body;
+      if (!orderedIds?.length) return res.status(400).json({ error: 'orderedIds required' });
+
+      const ops = orderedIds.map((id, i) => ({
+        updateOne: { filter: { _id: id, board: req.params.boardId }, update: { $set: { order: i } } }
+      }));
+      await Task.bulkWrite(ops);
+      res.json({ ok: true });
+    } catch (err) {
+      log.error('Task', `ReorderTasks failed: ${err.message}`);
+      res.status(500).json({ error: 'Failed to reorder tasks' });
+    }
+  },
+
   async bulkStatusChange(req, res) {
     try {
       const { taskIds, status, boardId } = req.body;
@@ -600,6 +616,42 @@ const taskController = {
     } catch (err) {
       log.error('Task', `BulkStatusChange failed: ${err.message}`);
       res.status(500).json({ error: 'Failed to update task statuses' });
+    }
+  },
+
+  async bulkPriorityChange(req, res) {
+    try {
+      const { taskIds, priority, boardId } = req.body;
+      if (!taskIds?.length || !priority) {
+        return res.status(400).json({ error: 'taskIds and priority are required' });
+      }
+      if (taskIds.length > MAX_BULK) {
+        return res.status(400).json({ error: `Maximum ${MAX_BULK} tasks per bulk operation` });
+      }
+
+      const bid = boardId || req.params.boardId;
+      const result = await Task.updateMany(
+        { _id: { $in: taskIds }, board: bid },
+        {
+          $set: { priority },
+          $push: {
+            history: {
+              changedBy: req.user._id,
+              action: 'priority_changed',
+              field: 'priority',
+              newValue: priority,
+              timestamp: new Date(),
+              metadata: { bulk: true }
+            }
+          }
+        }
+      );
+
+      socketService.bulkTasksUpdated(bid, taskIds, { priority }, req.user);
+      res.json({ modified: result.modifiedCount });
+    } catch (err) {
+      log.error('Task', `BulkPriorityChange failed: ${err.message}`);
+      res.status(500).json({ error: 'Failed to update task priorities' });
     }
   },
 

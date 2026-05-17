@@ -159,8 +159,22 @@ export default function AdminLogs() {
                   const { icon, color } = getActionIcon(log.action);
                   const restorable = canRestore(log);
                   const logId = log._id || log.id;
+                  const boardId = log.board?._id || log.board;
+                  const targetId = log.target?.id;
+                  const targetType = log.target?.type;
+                  const isClickable = !!boardId;
+                  const handleRowClick = () => {
+                    if (!boardId) return;
+                    const query = targetType === 'task' && targetId ? `?task=${targetId}` : '';
+                    navigate(`/boards/${boardId}${query}`);
+                  };
                   return (
-                    <tr key={logId || i}>
+                    <tr
+                      key={logId || i}
+                      onClick={handleRowClick}
+                      style={{ cursor: isClickable ? 'pointer' : 'default' }}
+                      className={isClickable ? 'task-table-row-clickable' : ''}
+                    >
                       <td style={{ textAlign: 'center', color }}>{icon}</td>
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -182,17 +196,13 @@ export default function AdminLogs() {
                         <span style={{ fontSize: 13 }}>{log.target?.name || '—'}</span>
                       </td>
                       <td>
-                        {log.board ? (
-                          <button
-                            className="btn btn-ghost btn-xs"
-                            onClick={() => navigate(`/boards/${log.board._id || log.board}`)}
-                            style={{ fontSize: 12, padding: '2px 6px' }}
-                          >
+                        {boardId ? (
+                          <span style={{ fontSize: 12, color: 'var(--accent)', fontWeight: 500 }}>
                             {log.board?.title || 'View'}
-                          </button>
+                          </span>
                         ) : '—'}
                       </td>
-                      <td style={{ textAlign: 'center' }}>
+                      <td style={{ textAlign: 'center' }} onClick={e => e.stopPropagation()}>
                         {restorable ? (
                           <button
                             className="btn btn-secondary btn-xs"

@@ -20,7 +20,6 @@ const taskShareSchema = new mongoose.Schema({
   token: {
     type: String,
     required: true,
-    unique: true,
     default: () => crypto.randomBytes(32).toString('hex')
   },
   permission: {
@@ -51,6 +50,7 @@ const taskShareSchema = new mongoose.Schema({
 });
 
 taskShareSchema.index({ task: 1, revoked: 1 });
+taskShareSchema.index({ token: 1 }, { unique: true });
 taskShareSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0, partialFilterExpression: { expiresAt: { $ne: null } } });
 
 taskShareSchema.methods.isActive = function () {

@@ -54,9 +54,13 @@ router.delete('/:boardId/tasks/:taskId/comments/:commentId', authenticate, check
 // Task activity
 router.get('/:boardId/tasks/:taskId/activity', authenticate, checkBoardAccess('view'), taskController.getActivity);
 
+// Reorder tasks
+router.patch('/:boardId/tasks/reorder', authenticate, checkBoardAccess('edit'), taskController.reorderTasks);
+
 // Bulk operations
 router.post('/:boardId/tasks/bulk/assign', authenticate, authorize('admin'), checkBoardAccess('edit'), taskController.bulkAssign);
 router.post('/:boardId/tasks/bulk/status', authenticate, authorize('admin'), checkBoardAccess('edit'), taskController.bulkStatusChange);
+router.post('/:boardId/tasks/bulk/priority', authenticate, authorize('admin'), checkBoardAccess('edit'), taskController.bulkPriorityChange);
 router.post('/:boardId/tasks/bulk/archive', authenticate, authorize('admin'), checkBoardAccess('edit'), taskController.bulkArchive);
 router.post('/:boardId/tasks/bulk/unarchive', authenticate, authorize('admin'), checkBoardAccess('edit'), taskController.bulkUnarchive);
 router.post('/:boardId/tasks/bulk/delete', authenticate, authorize('admin'), checkBoardAccess('edit'), taskController.bulkDelete);

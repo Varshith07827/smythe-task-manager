@@ -52,6 +52,14 @@ const boardSchema = new mongoose.Schema({
   archived: { type: Boolean, default: false }
 }, { timestamps: true });
 
+// Normalize legacy visibility values before save
+boardSchema.pre('save', function (next) {
+  if (this.permissions?.visibility && !['all', 'restricted'].includes(this.permissions.visibility)) {
+    this.permissions.visibility = 'all';
+  }
+  next();
+});
+
 boardSchema.index({ archived: 1, createdAt: -1 });
 boardSchema.index({ createdBy: 1 });
 

@@ -284,8 +284,18 @@ export default function BoardActivity() {
             const { icon, color } = getActionIcon(entry.action);
             const restorable = canRestore(entry);
             const displayChanges = expandChanges(entry.changes);
+            const taskId = getTaskId(entry);
+            const isTaskEntry = !!taskId && entry.target?.type === 'task';
+            const handleEntryClick = () => {
+              if (isTaskEntry) navigate(`/boards/${boardId}?task=${taskId}`);
+            };
             return (
-              <div key={entry._id || i} className="timeline-item">
+              <div
+                key={entry._id || i}
+                className="timeline-item"
+                onClick={handleEntryClick}
+                style={isTaskEntry ? { cursor: 'pointer' } : undefined}
+              >
                 <div className="timeline-line" />
                 <div className="timeline-dot" style={{ background: color, color: 'white' }}>{icon}</div>
                 <div className="timeline-content">

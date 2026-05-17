@@ -22,9 +22,13 @@ export const tasksApi = {
   // Per-task notifications
   updateNotifications: (boardId, taskId, data) => api.patch(`/boards/${boardId}/tasks/${taskId}/notifications`, data),
 
+  // Reorder
+  reorder: (boardId, data) => api.patch(`/boards/${boardId}/tasks/reorder`, data),
+
   // Bulk
   bulkAssign: (boardId, data) => api.post(`/boards/${boardId}/tasks/bulk/assign`, data),
   bulkStatus: (boardId, data) => api.post(`/boards/${boardId}/tasks/bulk/status`, data),
+  bulkPriority: (boardId, data) => api.post(`/boards/${boardId}/tasks/bulk/priority`, data),
   bulkArchive: (boardId, data) => api.post(`/boards/${boardId}/tasks/bulk/archive`, data),
   bulkUnarchive: (boardId, data) => api.post(`/boards/${boardId}/tasks/bulk/unarchive`, data)
 };

@@ -26,7 +26,7 @@ const taskSchema = new mongoose.Schema({
     changedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     action: {
       type: String,
-      enum: ['created', 'updated', 'status_changed', 'assigned', 'unassigned',
+      enum: ['created', 'updated', 'status_changed', 'priority_changed', 'assigned', 'unassigned',
              'commented', 'attachment_added', 'attachment_removed',
              'reminder_sent', 'notification_updated']
     },

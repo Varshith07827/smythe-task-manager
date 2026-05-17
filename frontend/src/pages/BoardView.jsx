@@ -12,6 +12,7 @@ import CreateTaskModal from '../components/CreateTaskModal';
 import ImportSpreadsheet from '../components/ImportSpreadsheet';
 import ColumnManager from '../components/ColumnManager';
 import StatusWorkflowModal from '../components/StatusWorkflowModal';
+import KanbanBoard from '../components/KanbanBoard';
 import Dropdown from '../components/Dropdown';
 import { format } from 'date-fns';
 
@@ -47,6 +48,9 @@ export default function BoardView() {
   const [reportEmail, setReportEmail] = useState('');
   const [sendingReport, setSendingReport] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
+  const [dragTask, setDragTask] = useState(null);
+  const [dropTarget, setDropTarget] = useState(null);
+  const scrollAnimRef = useRef(null);
 
   // View mode: 'kanban', 'table', or 'list'
   const [viewMode, setViewMode] = useState(() => {
@@ -219,6 +223,17 @@ export default function BoardView() {
     }
   };
 
+  const handleBulkPriority = async (priority) => {
+    try {
+      await tasksApi.bulkPriority(boardId, { taskIds: [...selectedTasks], priority, boardId });
+      setTasks(prev => prev.map(t => selectedTasks.has(t._id) ? { ...t, priority } : t));
+      setSelectedTasks(new Set());
+      alert.success(`${selectedTasks.size} task${selectedTasks.size > 1 ? 's' : ''} updated`);
+    } catch {
+      alert.error('Could not update priorities. Please try again.');
+    }
+  };
+
   const handleBulkArchive = async () => {
     try {
       if (showArchived) {
@@ -252,6 +267,120 @@ export default function BoardView() {
 
   const handleStatusWorkflow = (task, newStatus) => {
     setWorkflowTask(task); setWorkflowStatus(newStatus);
+  };
+
+  // Auto-scroll .page-body when dragging near edges
+  const startPageAutoScroll = useCallback((clientY) => {
+    if (scrollAnimRef.current) cancelAnimationFrame(scrollAnimRef.current);
+    const pageBody = document.querySelector('.page-body');
+    if (!pageBody) return;
+    const rect = pageBody.getBoundingClientRect();
+    const edgeSize = 60;
+    let dy = 0;
+    if (clientY < rect.top + edgeSize) dy = -10;
+    else if (clientY > rect.bottom - edgeSize) dy = 10;
+    if (dy) {
+      const tick = () => {
+        pageBody.scrollTop += dy;
+        scrollAnimRef.current = requestAnimationFrame(tick);
+      };
+      scrollAnimRef.current = requestAnimationFrame(tick);
+    } else {
+      if (scrollAnimRef.current) { cancelAnimationFrame(scrollAnimRef.current); scrollAnimRef.current = null; }
+    }
+  }, []);
+  const stopPageAutoScroll = useCallback(() => {
+    if (scrollAnimRef.current) { cancelAnimationFrame(scrollAnimRef.current); scrollAnimRef.current = null; }
+  }, []);
+
+  // Attach a global dragover listener while dragging to trigger auto-scroll
+  useEffect(() => {
+    if (!dragTask) return;
+    const onDragOver = (e) => startPageAutoScroll(e.clientY);
+    window.addEventListener('dragover', onDragOver);
+    return () => { window.removeEventListener('dragover', onDragOver); stopPageAutoScroll(); };
+  }, [dragTask, startPageAutoScroll, stopPageAutoScroll]);
+
+  const handleRowDragStart = (e, task) => {
+    setDragTask(task);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', task._id);
+  };
+  const handleRowDragEnd = () => { setDragTask(null); setDropTarget(null); stopPageAutoScroll(); };
+  const handleDropOnDelete = async () => {
+    if (!dragTask) return;
+    const isBulk = selectedTasks.has(dragTask._id) && selectedTasks.size > 1;
+    const ids = isBulk ? [...selectedTasks] : [dragTask._id];
+    setDragTask(null); setDropTarget(null);
+    try {
+      if (isBulk) {
+        await tasksApi.bulkDelete(boardId, { taskIds: ids, boardId });
+      } else {
+        await tasksApi.permanentDelete(boardId, ids[0]);
+      }
+      setTasks(prev => prev.filter(t => !ids.includes(t._id)));
+      setSelectedTasks(new Set());
+      alert.success(`${ids.length} task${ids.length > 1 ? 's' : ''} deleted`);
+    } catch { alert.error('Failed to delete'); }
+  };
+  const handleDropOnArchive = async () => {
+    if (!dragTask) return;
+    const isBulk = selectedTasks.has(dragTask._id) && selectedTasks.size > 1;
+    const ids = isBulk ? [...selectedTasks] : [dragTask._id];
+    setDragTask(null); setDropTarget(null);
+    try {
+      if (showArchived) {
+        // Unarchive (restore)
+        if (isBulk) {
+          await tasksApi.bulkUnarchive(boardId, { taskIds: ids, boardId });
+        } else {
+          await tasksApi.unarchive(boardId, ids[0]);
+        }
+        setTasks(prev => prev.filter(t => !ids.includes(t._id)));
+        setSelectedTasks(new Set());
+        alert.success(`${ids.length} task${ids.length > 1 ? 's' : ''} restored`);
+      } else {
+        // Archive
+        if (isBulk) {
+          await tasksApi.bulkArchive(boardId, { taskIds: ids, boardId });
+        } else {
+          await tasksApi.archive(boardId, ids[0]);
+        }
+        setTasks(prev => prev.filter(t => !ids.includes(t._id)));
+        setSelectedTasks(new Set());
+        alert.success(`${ids.length} task${ids.length > 1 ? 's' : ''} archived`);
+      }
+    } catch { alert.error(showArchived ? 'Failed to restore' : 'Failed to archive'); }
+  };
+  const handleDropOnStatus = async (targetStatus) => {
+    if (!dragTask || dragTask.status === targetStatus) { setDragTask(null); setDropTarget(null); return; }
+
+    const isBulk = selectedTasks.has(dragTask._id) && selectedTasks.size > 1;
+    const idsToMove = isBulk
+      ? [...selectedTasks].filter(id => { const t = tasks.find(tk => tk._id === id); return t && t.status !== targetStatus; })
+      : [dragTask._id];
+
+    if (idsToMove.length === 0) { setDragTask(null); setDropTarget(null); return; }
+
+    const idSet = new Set(idsToMove);
+    const snapshots = tasks.filter(t => idSet.has(t._id)).map(t => ({ id: t._id, status: t.status }));
+
+    setTasks(ts => ts.map(t => idSet.has(t._id) ? { ...t, status: targetStatus } : t));
+    setDragTask(null); setDropTarget(null);
+
+    try {
+      if (isBulk) {
+        await tasksApi.bulkStatus(boardId, { taskIds: idsToMove, status: targetStatus, boardId });
+      } else {
+        await tasksApi.update(boardId, idsToMove[0], { status: targetStatus });
+      }
+    } catch {
+      setTasks(ts => ts.map(t => {
+        const snap = snapshots.find(s => s.id === t._id);
+        return snap ? { ...t, status: snap.status } : t;
+      }));
+      alert.error('Failed to update status');
+    }
   };
 
   if (loading) return <div className="loading-spinner"><div className="spinner" /></div>;
@@ -409,6 +538,18 @@ export default function BoardView() {
                 </button>
               ))}
             </Dropdown>
+            <Dropdown
+              buttonClassName="btn btn-sm btn-secondary"
+              align="end"
+              buttonContent={<>Set priority <svg className="dropdown-chevron" width="10" height="10" viewBox="0 0 10 6" fill="none"><path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg></>}
+            >
+              {(close) => PRIORITY_OPTIONS.map(p => (
+                <button key={p} type="button" className="dropdown-item" onClick={() => { handleBulkPriority(p); close(); }}>
+                  <span className="status-dot" style={{ background: PRIORITY_COLORS[p], width: 6, height: 6 }} />
+                  {p}
+                </button>
+              ))}
+            </Dropdown>
             {isManager && <button type="button" className={`btn btn-sm ${showArchived ? 'btn-primary' : 'btn-danger'}`} onClick={handleBulkArchive}>{showArchived ? 'Restore' : 'Archive'}</button>}
             {isManager && <button type="button" className="btn btn-sm btn-danger" onClick={() => setConfirmBulkDelete(true)}>Delete</button>}
             <button type="button" className="btn btn-sm btn-ghost" onClick={() => setSelectedTasks(new Set())}>Clear</button>
@@ -416,8 +557,64 @@ export default function BoardView() {
         )}
       </AnimatePresence>
 
+      {/* Drop zones — shown when dragging a task */}
+      <AnimatePresence>
+        {dragTask && (
+          <motion.div className="drag-status-bar" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
+            {viewMode !== 'kanban' && STATUS_OPTIONS.map(s => {
+              const info = allStatuses[s] || { color: 'var(--accent)', label: s };
+              const isOver = dropTarget === s;
+              return (
+                <div
+                  key={s}
+                  className={`drag-status-zone${isOver ? ' drag-status-zone-over' : ''}${dragTask?.status === s ? ' drag-status-zone-current' : ''}`}
+                  style={{ '--zone-color': info.color }}
+                  onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
+                  onDragEnter={() => setDropTarget(s)}
+                  onDragLeave={() => { if (dropTarget === s) setDropTarget(null); }}
+                  onDrop={() => handleDropOnStatus(s)}
+                >
+                  <span className="drag-status-zone-dot" style={{ background: info.color }} />
+                  {info.label}
+                </div>
+              );
+            })}
+            {isManager && (
+              <>
+                <div
+                  className={`drag-status-zone drag-status-zone-action${dropTarget === '__archive' ? ' drag-status-zone-over' : ''}`}
+                  style={{ '--zone-color': showArchived ? 'var(--green)' : 'var(--orange)' }}
+                  onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
+                  onDragEnter={() => setDropTarget('__archive')}
+                  onDragLeave={() => { if (dropTarget === '__archive') setDropTarget(null); }}
+                  onDrop={handleDropOnArchive}
+                >
+                  {showArchived ? (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" /></svg>
+                  ) : (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M21 8v13H3V8" /><path d="M1 3h22v5H1z" /><path d="M10 12h4" /></svg>
+                  )}
+                  {showArchived ? 'Restore' : 'Archive'}
+                </div>
+                <div
+                  className={`drag-status-zone drag-status-zone-action drag-status-zone-danger${dropTarget === '__delete' ? ' drag-status-zone-over' : ''}`}
+                  style={{ '--zone-color': 'var(--red)' }}
+                  onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
+                  onDragEnter={() => setDropTarget('__delete')}
+                  onDragLeave={() => { if (dropTarget === '__delete') setDropTarget(null); }}
+                  onDrop={handleDropOnDelete}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" /></svg>
+                  Delete
+                </div>
+              </>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Task Content */}
-      {tasks.length === 0 ? (
+      {tasks.length === 0 && viewMode !== 'kanban' ? (
         <div className="empty-state">
           <div className="empty-state-icon">
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" strokeWidth="1.5" strokeLinecap="round">
@@ -436,68 +633,18 @@ export default function BoardView() {
         </div>
       ) : viewMode === 'kanban' ? (
         /* ========== KANBAN VIEW ========== */
-        <div className="kanban-board">
-          {Object.entries(allStatuses).map(([statusKey, statusInfo]) => {
-            const columnTasks = tasks.filter(t => t.status === statusKey);
-            return (
-              <div className="kanban-column" key={statusKey}>
-                <div className="kanban-column-header">
-                  <div className="kanban-column-title">
-                    <span className="status-dot" style={{ background: statusInfo.color, width: 10, height: 10 }} />
-                    <span>{statusInfo.label.toUpperCase()}</span>
-                  </div>
-                  <span className="kanban-column-count">{columnTasks.length}</span>
-                </div>
-                <div className="kanban-column-body">
-                  {columnTasks.map(task => {
-                    const priorityColor = allPriorityColors[task.priority] || 'var(--teal)';
-                    const assignees = task.assignedTo || [];
-                    const initials = (name) => name?.split(' ').map(n => n[0]).join('').toUpperCase() || '?';
-                    return (
-                      <motion.div
-                        key={task._id}
-                        className="kanban-card"
-                        onClick={() => setSelectedTask(task)}
-                        initial={{ opacity: 0, y: 8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        style={{ borderLeftColor: statusInfo.color }}
-                      >
-                        <div className="kanban-card-title">{task.title}</div>
-                        {task.description && (
-                          <div className="kanban-card-desc">{task.description.length > 60 ? task.description.slice(0, 60) + '...' : task.description}</div>
-                        )}
-                        <div className="kanban-card-footer">
-                          {assignees.length > 0 && (
-                            <div className="avatar-group" style={{ '--avatar-size': '22px' }}>
-                              {assignees.slice(0, 3).map(u => (
-                                <div key={u._id} className="user-avatar" style={{ width: 22, height: 22, fontSize: 8 }} title={u.name}>{initials(u.name)}</div>
-                              ))}
-                              {assignees.length > 3 && <div className="user-avatar" style={{ width: 22, height: 22, fontSize: 8, background: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}>+{assignees.length - 3}</div>}
-                            </div>
-                          )}
-                          <div className="kanban-card-meta">
-                            {task.dueDate && (
-                              <span className="kanban-card-due">
-                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
-                                {format(new Date(task.dueDate), 'MMM d')}
-                              </span>
-                            )}
-                            {task.comments?.length > 0 && (
-                              <span className="kanban-card-comments">
-                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" /></svg>
-                                {task.comments.length}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </motion.div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        <KanbanBoard
+          tasks={tasks}
+          boardId={boardId}
+          customStatuses={customStatusMap}
+          customPriorities={customPriorityMap}
+          onTaskClick={setSelectedTask}
+          onTasksChange={setTasks}
+          selectedTasks={selectedTasks}
+          onToggleTask={toggleTaskSelection}
+          onDragChange={setDragTask}
+          isManager={isManager}
+        />
       ) : viewMode === 'table' ? (
         /* ========== TABLE VIEW ========== */
         <div className="task-table-wrap">
@@ -537,6 +684,9 @@ export default function BoardView() {
                   customPriorities={customPriorityMap}
                   onBoardUpdated={loadBoard}
                   isManager={isManager}
+                  draggable
+                  onDragStart={(e) => handleRowDragStart(e, task)}
+                  onDragEnd={handleRowDragEnd}
                 />
               ))}
             </tbody>
@@ -555,10 +705,13 @@ export default function BoardView() {
               <motion.div
                 key={task._id}
                 className="task-list-card"
-                onClick={() => setSelectedTask(task)}
+                onClick={() => selectedTasks.size > 0 ? toggleTaskSelection(task._id) : setSelectedTask(task)}
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
                 style={{ '--priority-color': priorityColor }}
+                draggable
+                onDragStart={(e) => handleRowDragStart(e, task)}
+                onDragEnd={handleRowDragEnd}
               >
                 <div className="task-list-card-priority-bar" style={{ background: priorityColor }} />
                 <div className="task-list-card-body">

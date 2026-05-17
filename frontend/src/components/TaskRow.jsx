@@ -53,7 +53,7 @@ function useDropdownPortal(isOpen, triggerRef) {
   return pos;
 }
 
-export default function TaskRow({ task, columns, selected, onToggle, onClick, boardId, onUpdated, onDeleted, onStatusWorkflow, customStatuses: customStatusesProp, customPriorities: customPrioritiesProp, onBoardUpdated, isManager }) {
+export default function TaskRow({ task, columns, selected, onToggle, onClick, boardId, onUpdated, onDeleted, onStatusWorkflow, customStatuses: customStatusesProp, customPriorities: customPrioritiesProp, onBoardUpdated, isManager, draggable, onDragStart, onDragEnd }) {
   const confirm = useConfirm();
   const [editingCol, setEditingCol] = useState(null);
   const [editValue, setEditValue] = useState('');
@@ -260,7 +260,7 @@ export default function TaskRow({ task, columns, selected, onToggle, onClick, bo
   );
 
   return (
-    <tr className={selected ? 'row-selected' : ''} style={{ '--row-priority-color': priorityInfo.color }}>
+    <tr className={selected ? 'row-selected' : ''} style={{ '--row-priority-color': priorityInfo.color, cursor: draggable ? 'grab' : undefined }} draggable={draggable} onDragStart={onDragStart} onDragEnd={onDragEnd}>
       <td className="row-priority-indicator" style={{ width: 40 }}>
         <div className={`checkbox ${selected ? 'checked' : ''}`} onClick={e => { e.stopPropagation(); onToggle(); }}>
           {selected && <svg width="11" height="9" viewBox="0 0 11 9" fill="none"><path d="M1 4.5L4 7.5L10 1.5" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>}
