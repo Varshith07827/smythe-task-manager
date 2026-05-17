@@ -44,25 +44,7 @@ export default function AuthLayout({ navLinks = [], onSupport, children }) {
         onMouseEnter={handleSidebarEnter}
         onMouseLeave={handleSidebarLeave}
       >
-        <div className="sidebar-brand">
-          <div className="sidebar-brand-left">
-            {branding.faviconUrl ? (
-              <img
-                src={branding.faviconUrl}
-                alt={appName}
-                className="sidebar-brand-logo"
-                style={{ width: 36, height: 36, objectFit: 'cover', borderRadius: logoRadius }}
-                onError={e => { e.currentTarget.style.display = 'none'; }}
-              />
-            ) : (
-              <span className="sidebar-brand-mark">{brandMark}</span>
-            )}
-            <div className="sidebar-brand-text">
-              <span className="sidebar-brand-name">{appName}</span>
-              <span className="sidebar-brand-tagline">{branding.tagline || 'Task Management'}</span>
-            </div>
-          </div>
-        </div>
+        <div className="sidebar-brand" style={{ minHeight: 20 }} />
 
         <nav className="sidebar-nav">
           <div className="sidebar-group">
