@@ -8,8 +8,13 @@ const ticketMessageSchema = new mongoose.Schema({
   },
   sender: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
+    ref: 'User'
+  },
+  guestEmail: {
+    type: String,
+    trim: true,
+    lowercase: true,
+    maxlength: 320
   },
   body: {
     type: String,

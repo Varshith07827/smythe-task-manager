@@ -146,8 +146,10 @@ const ticketController = {
         filter.priority = priority;
       }
       if (search?.trim()) {
+        const searchRegex = { $regex: escapeRegex(search.trim().slice(0, 200)), $options: 'i' };
         filter.$or = [
-          { subject: { $regex: escapeRegex(search.trim().slice(0, 200)), $options: 'i' } }
+          { subject: searchRegex },
+          { guestEmail: searchRegex }
         ];
       }
 

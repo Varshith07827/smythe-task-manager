@@ -1,5 +1,7 @@
 const User = require('../models/User');
 const Organization = require('../models/Organization');
+const Ticket = require('../models/Ticket');
+const TicketMessage = require('../models/TicketMessage');
 const { generateToken } = require('../middleware/auth');
 const crypto = require('crypto');
 const emailService = require('../services/emailService');
@@ -366,8 +368,42 @@ const authController = {
       if (!subject?.trim() || !details?.trim()) return res.status(400).json({ error: 'Subject and details are required' });
 
       const normalizedEmail = email.toLowerCase().trim();
+      const cleanSubject = subject.trim().slice(0, 300);
+      const cleanDetails = details.trim().slice(0, 10000);
       const user = await User.findOne({ email: normalizedEmail });
 
+      // Create a support ticket in the database
+      const ticketData = {
+        subject: cleanSubject,
+        category: 'general',
+        priority: 'normal',
+        lastMessageAt: new Date(),
+        awaitingReplyFrom: 'admin',
+        messageCount: 1
+      };
+      if (user) {
+        ticketData.createdBy = user._id;
+        ticketData.lastMessageBy = user._id;
+        ticketData.readBy = [{ user: user._id, readAt: new Date() }];
+      } else {
+        ticketData.guestEmail = normalizedEmail;
+      }
+
+      const ticket = await Ticket.create(ticketData);
+
+      const messageData = {
+        ticket: ticket._id,
+        body: cleanDetails,
+        isAdminReply: false
+      };
+      if (user) {
+        messageData.sender = user._id;
+      } else {
+        messageData.guestEmail = normalizedEmail;
+      }
+      await TicketMessage.create(messageData);
+
+      // Notify admins via email
       const admins = await User.find({
         role: 'admin',
         status: 'active'
@@ -382,8 +418,8 @@ const authController = {
         const senderInfo = user ? `${user.name} (${user.email})` : `${normalizedEmail} (unregistered)`;
 
         const htmlBody = emailService.buildNotificationEmail(
-          `Support Request: ${subject.trim().slice(0, 200)}`,
-          `From: ${senderInfo}\nDate: ${timestamp}\n\nSubject: ${subject.trim().slice(0, 200)}\n\nDetails:\n${details.trim().slice(0, 5000)}`,
+          `Support Request: ${cleanSubject}`,
+          `From: ${senderInfo}\nDate: ${timestamp}\n\nSubject: ${cleanSubject}\n\nDetails:\n${cleanDetails}`,
           'reminder',
           branding
         );

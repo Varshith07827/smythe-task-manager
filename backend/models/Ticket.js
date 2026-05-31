@@ -10,8 +10,13 @@ const ticketSchema = new mongoose.Schema({
   },
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
+    ref: 'User'
+  },
+  guestEmail: {
+    type: String,
+    trim: true,
+    lowercase: true,
+    maxlength: 320
   },
   status: {
     type: String,

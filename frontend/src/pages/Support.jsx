@@ -242,8 +242,11 @@ export default function Support() {
                       <StatusBadge status={ticket.status} />
                     </div>
                     <div className="support-ticket-item-meta">
-                      {isAdmin && ticket.createdBy && (
-                        <span className="support-ticket-item-user">{ticket.createdBy.name}</span>
+                      {isAdmin && (ticket.createdBy || ticket.guestEmail) && (
+                        <span className="support-ticket-item-user">
+                          {ticket.createdBy?.name || ticket.guestEmail}
+                          {ticket.guestEmail && !ticket.createdBy && <span style={{ fontSize: 10, opacity: 0.6, marginLeft: 4 }}>(guest)</span>}
+                        </span>
                       )}
                       <span>{ticket.messageCount || 1} message{(ticket.messageCount || 1) !== 1 ? 's' : ''}</span>
                       <span>{formatDistanceToNow(new Date(ticket.lastMessageAt || ticket.createdAt), { addSuffix: true })}</span>
@@ -290,6 +293,12 @@ export default function Support() {
                     <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
                       #{selectedTicket._id.slice(-6)}
                     </span>
+                    {isAdmin && (selectedTicket.createdBy?.name || selectedTicket.guestEmail) && (
+                      <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+                        by {selectedTicket.createdBy?.name || selectedTicket.guestEmail}
+                        {selectedTicket.guestEmail && !selectedTicket.createdBy && ' (guest)'}
+                      </span>
+                    )}
                   </div>
                 </div>
                 {isAdmin && (
@@ -348,12 +357,13 @@ export default function Support() {
                               {msg.sender?.avatar ? (
                                 <img src={msg.sender.avatar.startsWith('/api/') ? msg.sender.avatar : msg.sender.avatar} alt="" />
                               ) : (
-                                <span>{msg.sender?.name?.charAt(0)?.toUpperCase() || '?'}</span>
+                                <span>{(msg.sender?.name || msg.guestEmail || '?').charAt(0).toUpperCase()}</span>
                               )}
                             </div>
                             <span className="support-message-sender">
-                              {msg.sender?.name || 'Unknown'}
+                              {msg.sender?.name || msg.guestEmail || 'Unknown'}
                               {msg.isAdminReply && <span className="support-admin-tag">Admin</span>}
+                              {!msg.sender && msg.guestEmail && <span className="support-admin-tag" style={{ background: 'var(--orange-subtle)', color: 'var(--orange)' }}>Guest</span>}
                             </span>
                             <span className="support-msg-time">
                               {formatDistanceToNow(new Date(msg.createdAt), { addSuffix: true })}
